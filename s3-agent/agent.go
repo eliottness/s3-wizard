@@ -1,37 +1,42 @@
 package main
 
-import "github.com/alecthomas/kong"
+import (
+	"fmt"
+	"github.com/alecthomas/kong"
+)
 
 type Context struct {
-    Debug bool
-}
-
-type SendCmd struct {
-    configPath string `arg:"config" name:"Config Path" help:"Config of the agent." type:"path"`
-    syncFolder string `arg:"folder" name:"Sync Folder" help:"Folder to send." type:"path"`
-}
-
-func (obj *SendCmd) Run(ctx *Context) error {
-    return nil
+	Debug bool
 }
 
 type ReceiveCmd struct {
-    configPath string `arg:"config" name:"Config Path" help:"Config of the agent." type:"path"`
-    syncFolder string `arg:"folder" name:"Sync Folder" help:"Folder to send." type:"path"`
+	ConfigPath     string `arg:"" name:"configPath" help:"Path to the agent config file." type:"path"`
+	SyncFolderPath string `arg:"" name:"syncFolderPath" help:"Path to the folder to sync." type:"path"`
 }
 
-func (obj *ReceiveCmd) Run(ctx *Context) error {
-    return nil
+func (cmd *ReceiveCmd) Run(ctx *Context) error {
+	fmt.Println("receive", cmd.ConfigPath, cmd.SyncFolderPath)
+	return nil
 }
 
-var CLI struct {
-    Debug   bool       `help:"Enable debug mode."`
-    Send    SendCmd    `cmd:"send" help:"SendCmd files to the configured remote."`
-    Receive ReceiveCmd `cmd:"receive" help:"Retrieve files for the configured remote."`
+type SendCmd struct {
+	ConfigPath     string `arg:"" name:"configPath" help:"Path to the agent config file." type:"path"`
+	SyncFolderPath string `arg:"" name:"syncFolderPath" help:"Path to the folder to sync." type:"path"`
+}
+
+func (cmd *SendCmd) Run(ctx *Context) error {
+	fmt.Println("send", cmd.ConfigPath, cmd.SyncFolderPath)
+	return nil
+}
+
+var cli struct {
+	Debug bool       `help:"Enable debug mode."`
+	Rm    ReceiveCmd `cmd:"" name:"receive" help:"Remove files."`
+	Send  SendCmd    `cmd:"" name:"send" help:"List paths."`
 }
 
 func main() {
-    ctx := kong.Parse(&CLI)
-    err := ctx.Run(&Context{Debug: CLI.Debug})
-    ctx.FatalIfErrorf(err)
+	ctx := kong.Parse(&cli)
+	err := ctx.Run(&Context{Debug: cli.Debug})
+	ctx.FatalIfErrorf(err)
 }
