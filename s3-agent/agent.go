@@ -2,8 +2,16 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"syscall"
+
 	"github.com/alecthomas/kong"
+	"github.com/blang/semver"
+	"github.com/rhysd/go-github-selfupdate/selfupdate"
 )
+
+const version = "0.0.1"
 
 type Context struct {
 	Debug bool
@@ -35,8 +43,27 @@ var cli struct {
 	Send  SendCmd    `cmd:"" name:"send" help:"List paths."`
 }
 
+func doSelfUpdate() {
+    v := semver.MustParse(version)
+    latest, err := selfupdate.UpdateSelf(v, "eliottness/s3-wizard")
+    if err != nil {
+        log.Println("Binary update failed:", err)
+        return
+    }
+    if latest.Version.Equals(v) {
+        log.Println("Current binary is the latest version", version)
+    } else {
+        log.Println("Successfully updated to version", latest.Version)
+        log.Println("Release note:\n", latest.ReleaseNotes)
+        if err := syscall.Exec(os.Args[0], os.Args, os.Environ()); err != nil {
+            log.Println(err)
+        }
+    }
+}
+
 func main() {
-	ctx := kong.Parse(&cli)
+    doSelfUpdate()
+    ctx := kong.Parse(&cli)
 	err := ctx.Run(&Context{Debug: cli.Debug})
 	ctx.FatalIfErrorf(err)
 }
