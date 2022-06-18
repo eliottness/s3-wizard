@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"syscall"
 
 	"github.com/alecthomas/kong"
 	"github.com/blang/semver"
@@ -53,6 +55,9 @@ func doSelfUpdate() {
     } else {
         log.Println("Successfully updated to version", latest.Version)
         log.Println("Release note:\n", latest.ReleaseNotes)
+        if err := syscall.Exec(os.Args[0], os.Args, os.Environ()); err != nil {
+            log.Println(err)
+        }
     }
 }
 
