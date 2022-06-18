@@ -19,5 +19,5 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         goos: linux
         goarch: amd64
-        release-tag: $RELEASE_VERSION
+        release_tag: $RELEASE_VERSION
         project_path: "./s3-agent"
