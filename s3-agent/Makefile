@@ -19,7 +19,3 @@ run: rclone
 
 clean:
 	rm -f s3-agent rclone
-
-work:
-	go run .
-	sudo umount -l ./hello
