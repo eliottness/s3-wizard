@@ -71,29 +71,6 @@ type S3Node struct {
 	RootData *S3Root
 }
 
-var _ = (fs.NodeStatfser)((*S3Node)(nil))
-var _ = (fs.NodeStatfser)((*S3Node)(nil))
-var _ = (fs.NodeGetattrer)((*S3Node)(nil))
-var _ = (fs.NodeGetxattrer)((*S3Node)(nil))
-var _ = (fs.NodeSetxattrer)((*S3Node)(nil))
-var _ = (fs.NodeRemovexattrer)((*S3Node)(nil))
-var _ = (fs.NodeListxattrer)((*S3Node)(nil))
-var _ = (fs.NodeReadlinker)((*S3Node)(nil))
-var _ = (fs.NodeOpener)((*S3Node)(nil))
-var _ = (fs.NodeCopyFileRanger)((*S3Node)(nil))
-var _ = (fs.NodeLookuper)((*S3Node)(nil))
-var _ = (fs.NodeOpendirer)((*S3Node)(nil))
-var _ = (fs.NodeReaddirer)((*S3Node)(nil))
-var _ = (fs.NodeMkdirer)((*S3Node)(nil))
-var _ = (fs.NodeMknoder)((*S3Node)(nil))
-var _ = (fs.NodeLinker)((*S3Node)(nil))
-var _ = (fs.NodeSymlinker)((*S3Node)(nil))
-var _ = (fs.NodeUnlinker)((*S3Node)(nil))
-var _ = (fs.NodeRmdirer)((*S3Node)(nil))
-var _ = (fs.NodeRenamer)((*S3Node)(nil))
-var _ = (fs.NodeCreater)((*S3Node)(nil))
-var _ = (fs.NodeSetattrer)((*S3Node)(nil))
-
 
 func (n *S3Node) Statfs(ctx context.Context, out *fuse.StatfsOut) syscall.Errno {
 	s := syscall.Statfs_t{}
@@ -141,7 +118,6 @@ func (n *S3Node) preserveOwner(ctx context.Context, path string) error {
 }
 
 func (n *S3Node) Mknod(ctx context.Context, name string, mode, rdev uint32, out *fuse.EntryOut) (*fs.Inode, syscall.Errno) {
-    log.Println(name)
 	p := filepath.Join(n.path(), name)
 	err := syscall.Mknod(p, mode, int(rdev))
 	if err != nil {
@@ -163,7 +139,6 @@ func (n *S3Node) Mknod(ctx context.Context, name string, mode, rdev uint32, out 
 }
 
 func (n *S3Node) Mkdir(ctx context.Context, name string, mode uint32, out *fuse.EntryOut) (*fs.Inode, syscall.Errno) {
-    log.Println(name)
 	p := filepath.Join(n.path(), name)
 	err := os.Mkdir(p, os.FileMode(mode))
 	if err != nil {
@@ -191,12 +166,18 @@ func (n *S3Node) Rmdir(ctx context.Context, name string) syscall.Errno {
 }
 
 func (n *S3Node) Unlink(ctx context.Context, name string) syscall.Errno {
+    // TODO
+    // if symlink, delete the symlink
+    // if file and islocal, delete the file
+    // if file and isremote, delete the file on the remote
 	p := filepath.Join(n.path(), name)
 	err := syscall.Unlink(p)
 	return fs.ToErrno(err)
 }
 
 func (n *S3Node) Rename(ctx context.Context, name string, newParent fs.InodeEmbedder, newName string, flags uint32) syscall.Errno {
+    // TODO
+    // Rename in the db
 	if flags & 0x02 != 0 {
 		return n.renameExchange(name, newParent, newName)
 	}
@@ -210,7 +191,7 @@ func (n *S3Node) Rename(ctx context.Context, name string, newParent fs.InodeEmbe
 
 
 func (n *S3Node) Create(ctx context.Context, name string, flags uint32, mode uint32, out *fuse.EntryOut) (inode *fs.Inode, fh fs.FileHandle, fuseFlags uint32, errno syscall.Errno) {
-	p := filepath.Join(n.path(), name)
+    p := filepath.Join(n.path(), name)
 	flags = flags &^ syscall.O_APPEND
 	fd, err := syscall.Open(p, int(flags)|os.O_CREATE, mode)
 	if err != nil {
@@ -272,6 +253,9 @@ func (n *S3Node) Link(ctx context.Context, target fs.InodeEmbedder, name string,
 func (n *S3Node) Readlink(ctx context.Context) ([]byte, syscall.Errno) {
 	p := n.path()
 
+    // TODO
+    // if isremote && isfile, download the file and update the db about the file location + delete on the S3
+
 	for l := 256; ; l *= 2 {
 		buf := make([]byte, l)
 		sz, err := syscall.Readlink(p, buf)
@@ -286,6 +270,10 @@ func (n *S3Node) Readlink(ctx context.Context) ([]byte, syscall.Errno) {
 }
 
 func (n *S3Node) Open(ctx context.Context, flags uint32) (fh fs.FileHandle, fuseFlags uint32, errno syscall.Errno) {
+
+    // TODO
+    // if isremote && isfile, download the file and update the db about the file location + delete on the S3
+
 	flags = flags &^ syscall.O_APPEND
 	p := n.path()
 	f, err := syscall.Open(p, int(flags), 0)
