@@ -21,5 +21,5 @@ clean:
 	rm -f s3-agent rclone
 
 work:
-	sudo umount -l ./hello
 	go run .
+	sudo umount -l ./hello
