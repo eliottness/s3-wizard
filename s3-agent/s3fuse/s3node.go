@@ -6,7 +6,6 @@ package s3fuse
 
 import (
 	"context"
-	"log"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -271,9 +270,6 @@ func (n *S3Node) Readlink(ctx context.Context) ([]byte, syscall.Errno) {
 
 func (n *S3Node) Open(ctx context.Context, flags uint32) (fh fs.FileHandle, fuseFlags uint32, errno syscall.Errno) {
 
-    // TODO
-    // if isremote && isfile, download the file and update the db about the file location + delete on the S3
-
 	flags = flags &^ syscall.O_APPEND
 	p := n.path()
 	f, err := syscall.Open(p, int(flags), 0)
@@ -311,6 +307,9 @@ func (n *S3Node) Getattr(ctx context.Context, f fs.FileHandle, out *fuse.AttrOut
 	} else {
 		err = syscall.Lstat(p, &st)
 	}
+
+    // TODO
+    // if isremote && isfile, set the size of the file to the good size in db
 
 	if err != nil {
 		return fs.ToErrno(err)
@@ -371,6 +370,10 @@ func (n *S3Node) Setattr(ctx context.Context, f fs.FileHandle, in *fuse.SetAttrI
 		}
 
 		if sz, ok := in.GetSize(); ok {
+            // TODO
+            // User asked to truncate the file
+            // if isremote && isfile, download the file and update the db about the file location + delete on the S3
+            // then replace the file descriptor with the new file descriptor
 			if err := syscall.Truncate(p, int64(sz)); err != nil {
 				return fs.ToErrno(err)
 			}

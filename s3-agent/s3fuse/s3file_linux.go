@@ -16,6 +16,10 @@ import (
 func (f *S3File) Allocate(ctx context.Context, off uint64, sz uint64, mode uint32) syscall.Errno {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+
+    // TODO
+    // if isremote && isfile, download the file and update the db about the file location + delete on the S3
+
 	err := syscall.Fallocate(f.fd, mode, int64(off), int64(sz))
 	if err != nil {
 		return fs.ToErrno(err)

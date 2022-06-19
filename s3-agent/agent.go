@@ -83,6 +83,9 @@ func main() {
 	// Leave file permissions on "000" files as-is
 	opts.NullPermissions = true
 
+    opts.MountOptions.EnableLocks = false;
+    opts.MountOptions.Debug = true;
+
 	server, err := fs.Mount("./hello", loopbackRoot, opts)
 	if err != nil {
 		log.Fatalf("Mount fail: %v\n", err)

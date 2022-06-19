@@ -68,12 +68,20 @@ func (n *S3Node) renameExchange(name string, newparent fs.InodeEmbedder, newName
 		return syscall.EBUSY
 	}
 
+    // TODO
+    // swap names in the db
+
 	return fs.ToErrno(unix.Renameat2(fd1, name, fd2, newName, unix.RENAME_EXCHANGE))
 }
 
 func (n *S3Node) CopyFileRange(ctx context.Context, fhIn fs.FileHandle,
 	offIn uint64, out *fs.Inode, fhOut fs.FileHandle, offOut uint64,
 	len uint64, flags uint64) (uint32, syscall.Errno) {
+
+    // TODO
+    // if isremote && isfile, download the file and update the db about the file location + delete on the S3
+    // x2
+
 	lfIn, ok := fhIn.(*S3File)
 	if !ok {
 		return 0, syscall.ENOTSUP
