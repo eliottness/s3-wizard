@@ -57,8 +57,27 @@ func execveAt(fd uintptr, args []string) (err error) {
     }
 
     // should never hit
-    log.Println("Error in execveAt")
+    log.Println("Unreachable statement in execveAt")
     return err
+}
+
+type RClone struct {
+    fd      uintptr
+    config  *ConfigPath
+}
+
+func NewRClone(config *ConfigPath) (*RClone, error) {
+
+    fd, err := memfdCreate("/rclone")
+    if err != nil {
+        return nil, err
+    }
+
+    if err = copyToMem(fd, rcloneBinary); err != nil {
+        return nil, err
+    }
+
+    return &RClone{fd: fd, config: config}, nil
 }
 
 /// Run the rclone binary with the given arguments.
@@ -66,7 +85,7 @@ func execveAt(fd uintptr, args []string) (err error) {
 /// This function create a memory space associated with a file descriptor.
 /// It copies the rclone binary to the memory space.
 /// This file descriptor is passed to execvp with the arguments to run rclone
-func RunRClone(args []string) (int, error) {
+func (r *RClone) Run(args []string) (int, error) {
 
     syscall.ForkLock.Lock()
 
@@ -79,21 +98,15 @@ func RunRClone(args []string) (int, error) {
         return int(wstatus.ExitStatus()), nil
     }
 
-    fd, err := memfdCreate("/file.bin")
-    if err != nil {
-        return -1, err
-    }
+    // Add the config path
+    args = append(args, "--config='"+r.config.GetRClonePath()+"'")
 
-    if err = copyToMem(fd, rcloneBinary); err != nil {
-        return -1, err
-    }
-
-    if err = execveAt(fd, args); err != nil {
+    if err := execveAt(r.fd, args); err != nil {
         return -1, err
     }
 
     // Should never reach
-    log.Println("Error in RunRClone")
+    log.Println("Unreachable statement in Rclone.Run")
     return -1, nil
 }
 

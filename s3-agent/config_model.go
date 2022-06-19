@@ -40,12 +40,6 @@ type ValueTypeParamater struct {
     unit    string
 }
 
-type Server struct {
-    Url url.URL     `json:"url"`        // url of the server to connect to
-    User string     `json:"user"`       // user to connect to the server
-    Password string `json:"password"`   // password to connect to the server
-}
-
 type Rule struct {
     // type of rule, must be in the elements above
     Type    RuleType        `json:"type"`
@@ -64,8 +58,8 @@ type Rule struct {
 }
 
 type Config struct {
-    Servers map[string]Server   `json:"servers"`            // servers to connect to
-    Rules   []Rule              `json:"rules"`              // rules to apply
-    ExcludePatterns []string    `json:"exclude_patterns"`   // exclude files matching this paterns
-
+    Servers map[string]string                   `json:"servers"`            // servers to connect to
+    Rules   []Rule                              `json:"rules"`              // rules to apply
+    ExcludePatterns []string                    `json:"exclude_patterns"`   // exclude files matching this paterns
+    RCloneConfig map[string]map[string]string   `json:"rclone_config"`      // Embedded rclone ini config
 }

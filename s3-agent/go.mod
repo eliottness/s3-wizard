@@ -4,13 +4,16 @@ go 1.18
 
 require (
 	github.com/alecthomas/kong v0.5.0
-	github.com/google/uuid v1.3.0
 	github.com/hanwen/go-fuse/v2 v2.1.0
 )
 
 require github.com/rhysd/go-github-selfupdate v1.2.2
 
-require github.com/blang/semver v3.5.1+incompatible
+require (
+	github.com/blang/semver v3.5.1+incompatible
+	golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a
+	gopkg.in/ini.v1 v1.66.6
+)
 
 require (
 	github.com/golang/protobuf v1.3.2 // indirect
@@ -23,6 +26,5 @@ require (
 	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2 // indirect
 	golang.org/x/net v0.0.0-20190311183353-d8887717615a // indirect
 	golang.org/x/oauth2 v0.0.0-20181106182150-f42d05182288 // indirect
-	golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a // indirect
 	google.golang.org/appengine v1.3.0 // indirect
 )
