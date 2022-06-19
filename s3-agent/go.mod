@@ -20,6 +20,9 @@ require (
 	github.com/google/go-github/v30 v30.1.0 // indirect
 	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/inconshreveable/go-update v0.0.0-20160112193335-8152e7eb6ccf // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/mattn/go-sqlite3 v1.14.13 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/tcnksm/go-gitconfig v0.1.2 // indirect
 	github.com/ulikunitz/xz v0.5.5 // indirect
@@ -27,4 +30,6 @@ require (
 	golang.org/x/net v0.0.0-20190311183353-d8887717615a // indirect
 	golang.org/x/oauth2 v0.0.0-20181106182150-f42d05182288 // indirect
 	google.golang.org/appengine v1.3.0 // indirect
+	gorm.io/driver/sqlite v1.3.4 // indirect
+	gorm.io/gorm v1.23.6 // indirect
 )

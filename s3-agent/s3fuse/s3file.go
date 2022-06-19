@@ -12,8 +12,8 @@ import (
 
 	"syscall"
 
-	"github.com/hanwen/go-fuse/v2/fuse"
 	"github.com/hanwen/go-fuse/v2/fs"
+	"github.com/hanwen/go-fuse/v2/fuse"
 	"golang.org/x/sys/unix"
 )
 
@@ -47,9 +47,9 @@ var _ = (fs.FileAllocater)((*S3File)(nil))
 // var _ = (fs.FileSetlkwer)((*S3File)(nil))
 
 func (f *S3File) Read(ctx context.Context, buf []byte, off int64) (res fuse.ReadResult, errno syscall.Errno) {
-    // TODO
-    // if isremote && isfile, download the file and update the db about the file location + delete on the S3
-    // then replace the file descriptor with the new file descriptor
+	// TODO
+	// if isremote && isfile, download the file and update the db about the file location + delete on the S3
+	// then replace the file descriptor with the new file descriptor
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -58,9 +58,9 @@ func (f *S3File) Read(ctx context.Context, buf []byte, off int64) (res fuse.Read
 }
 
 func (f *S3File) Write(ctx context.Context, data []byte, off int64) (uint32, syscall.Errno) {
-    // TODO
-    // if isremote && isfile, download the file and update the db about the file location + delete on the S3
-    // then replace the file descriptor with the new file descriptor
+	// TODO
+	// if isremote && isfile, download the file and update the db about the file location + delete on the S3
+	// then replace the file descriptor with the new file descriptor
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -159,10 +159,10 @@ func (f *S3File) setAttr(ctx context.Context, in *fuse.SetAttrIn) syscall.Errno 
 	}
 
 	if sz, ok := in.GetSize(); ok {
-        // TODO
-        // User asked to truncate the file
-        // if isremote && isfile, download the file and update the db about the file location + delete on the S3
-        // then replace the file descriptor with the new file descriptor
+		// TODO
+		// User asked to truncate the file
+		// if isremote && isfile, download the file and update the db about the file location + delete on the S3
+		// then replace the file descriptor with the new file descriptor
 
 		errno = fs.ToErrno(syscall.Ftruncate(f.fd, int64(sz)))
 		if errno != 0 {
@@ -181,8 +181,8 @@ func (f *S3File) Getattr(ctx context.Context, a *fuse.AttrOut) syscall.Errno {
 		return fs.ToErrno(err)
 	}
 
-    // TODO
-    // if isremote && isfile, set the size of the file to the good size in db
+	// TODO
+	// if isremote && isfile, set the size of the file to the good size in db
 
 	a.FromStat(&st)
 
@@ -193,9 +193,9 @@ func (f *S3File) Lseek(ctx context.Context, off uint64, whence uint32) (uint64, 
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-    // TODO
-    // if isremote && isfile, download the file and update the db about the file location + delete on the S3
-    // then replace the file descriptor with the new file descriptor
+	// TODO
+	// if isremote && isfile, download the file and update the db about the file location + delete on the S3
+	// then replace the file descriptor with the new file descriptor
 
 	n, err := unix.Seek(f.fd, int64(off), int(whence))
 	return uint64(n), fs.ToErrno(err)

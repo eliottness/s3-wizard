@@ -2,17 +2,15 @@ package main
 
 import (
 	"fmt"
+	"github.com/eliottness/s3-agent/s3fuse"
 	"log"
 	"os"
 	"syscall"
-    "log"
-    "github.com/eliottness/s3-agent/s3fuse"
 
 	"github.com/alecthomas/kong"
 	"github.com/blang/semver"
+	"github.com/hanwen/go-fuse/v2/fs"
 	"github.com/rhysd/go-github-selfupdate/selfupdate"
-	"github.com/alecthomas/kong"
-    "github.com/hanwen/go-fuse/v2/fs"
 )
 
 const version = "0.0.1"
@@ -48,32 +46,32 @@ var cli struct {
 }
 
 func doSelfUpdate() {
-    v := semver.MustParse(version)
-    latest, err := selfupdate.UpdateSelf(v, "eliottness/s3-wizard")
-    if err != nil {
-        log.Println("Binary update failed:", err)
-        return
-    }
-    if latest.Version.Equals(v) {
-        log.Println("Current binary is the latest version", version)
-    } else {
-        log.Println("Successfully updated to version", latest.Version)
-        log.Println("Release note:\n", latest.ReleaseNotes)
-        if err := syscall.Exec(os.Args[0], os.Args, os.Environ()); err != nil {
-            log.Println(err)
-        }
-    }
+	v := semver.MustParse(version)
+	latest, err := selfupdate.UpdateSelf(v, "eliottness/s3-wizard")
+	if err != nil {
+		log.Println("Binary update failed:", err)
+		return
+	}
+	if latest.Version.Equals(v) {
+		log.Println("Current binary is the latest version", version)
+	} else {
+		log.Println("Successfully updated to version", latest.Version)
+		log.Println("Release note:\n", latest.ReleaseNotes)
+		if err := syscall.Exec(os.Args[0], os.Args, os.Environ()); err != nil {
+			log.Println(err)
+		}
+	}
 }
 
 func main() {
-    doSelfUpdate()
+	doSelfUpdate()
 
-    loopbackRoot, err := s3fuse.NewS3Root("./tmp")
+	loopbackRoot, err := s3fuse.NewS3Root("./tmp")
 	if err != nil {
 		log.Fatalf("NewLoopbackRoot(%s): %v\n", "./tmp", err)
 	}
 
-    opts := &fs.Options{}
+	opts := &fs.Options{}
 
 	opts.MountOptions.Options = append(opts.MountOptions.Options, "default_permissions")
 	// First column in "df -T": original dir
@@ -83,15 +81,15 @@ func main() {
 	// Leave file permissions on "000" files as-is
 	opts.NullPermissions = true
 
-    opts.MountOptions.EnableLocks = false;
-    opts.MountOptions.Debug = true;
+	opts.MountOptions.EnableLocks = false
+	opts.MountOptions.Debug = true
 
 	server, err := fs.Mount("./hello", loopbackRoot, opts)
 	if err != nil {
 		log.Fatalf("Mount fail: %v\n", err)
 	}
 
-    server.Wait()
+	server.Wait()
 
 	ctx := kong.Parse(&cli)
 	err = ctx.Run(&Context{Debug: cli.Debug})

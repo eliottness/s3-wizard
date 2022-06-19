@@ -14,70 +14,70 @@ import (
 var rcloneBinary []byte
 
 func memfdCreate(path string) (r1 uintptr, err error) {
-    s, err := syscall.BytePtrFromString(path)
-    if err != nil {
-        return 0, err
-    }
+	s, err := syscall.BytePtrFromString(path)
+	if err != nil {
+		return 0, err
+	}
 
-    // https://blog.rchapman.org/posts/Linux_System_Call_Table_for_x86_64/
-    r1, _, errno := syscall.Syscall(319, uintptr(unsafe.Pointer(s)), 0, 0)
+	// https://blog.rchapman.org/posts/Linux_System_Call_Table_for_x86_64/
+	r1, _, errno := syscall.Syscall(319, uintptr(unsafe.Pointer(s)), 0, 0)
 
-    if int(r1) == -1 {
-        return r1, errno
-    }
+	if int(r1) == -1 {
+		return r1, errno
+	}
 
-    return r1, nil
+	return r1, nil
 }
 
 func copyToMem(fd uintptr, buf []byte) (err error) {
-    _, err = syscall.Write(int(fd), buf)
-    if err != nil {
-        return err
-    }
+	_, err = syscall.Write(int(fd), buf)
+	if err != nil {
+		return err
+	}
 
-    return nil
+	return nil
 }
 
 func execveAt(fd uintptr, args []string) (err error) {
 
-    argv := make([]*C.char, len(args))
-    for i, s := range args {
-        cs := C.CString(s)
-        defer C.free(unsafe.Pointer(cs))
-        argv[i] = cs
-    }
+	argv := make([]*C.char, len(args))
+	for i, s := range args {
+		cs := C.CString(s)
+		defer C.free(unsafe.Pointer(cs))
+		argv[i] = cs
+	}
 
-    s, err := syscall.BytePtrFromString("")
-    if err != nil {
-        return err
-    }
-    ret, _, errno := syscall.Syscall6(322, fd, uintptr(unsafe.Pointer(s)), uintptr(unsafe.Pointer(&argv[0])), 0, 0x1000, 0)
-    if int(ret) == -1 {
-        return errno
-    }
+	s, err := syscall.BytePtrFromString("")
+	if err != nil {
+		return err
+	}
+	ret, _, errno := syscall.Syscall6(322, fd, uintptr(unsafe.Pointer(s)), uintptr(unsafe.Pointer(&argv[0])), 0, 0x1000, 0)
+	if int(ret) == -1 {
+		return errno
+	}
 
-    // should never hit
-    log.Println("Unreachable statement in execveAt")
-    return err
+	// should never hit
+	log.Println("Unreachable statement in execveAt")
+	return err
 }
 
 type RClone struct {
-    fd      uintptr
-    config  *ConfigPath
+	fd     uintptr
+	config *ConfigPath
 }
 
 func NewRClone(config *ConfigPath) (*RClone, error) {
 
-    fd, err := memfdCreate("/rclone")
-    if err != nil {
-        return nil, err
-    }
+	fd, err := memfdCreate("/rclone")
+	if err != nil {
+		return nil, err
+	}
 
-    if err = copyToMem(fd, rcloneBinary); err != nil {
-        return nil, err
-    }
+	if err = copyToMem(fd, rcloneBinary); err != nil {
+		return nil, err
+	}
 
-    return &RClone{fd: fd, config: config}, nil
+	return &RClone{fd: fd, config: config}, nil
 }
 
 /// Run the rclone binary with the given arguments.
@@ -87,26 +87,25 @@ func NewRClone(config *ConfigPath) (*RClone, error) {
 /// This file descriptor is passed to execvp with the arguments to run rclone
 func (r *RClone) Run(args []string) (int, error) {
 
-    syscall.ForkLock.Lock()
+	syscall.ForkLock.Lock()
 
-    id, _, _ := syscall.Syscall(syscall.SYS_FORK, 0, 0, 0)
-    if id != 0 {
-        syscall.ForkLock.Unlock()
-        var wstatus syscall.WaitStatus;
-        syscall.Wait4(int(id), &wstatus, 0, nil)
+	id, _, _ := syscall.Syscall(syscall.SYS_FORK, 0, 0, 0)
+	if id != 0 {
+		syscall.ForkLock.Unlock()
+		var wstatus syscall.WaitStatus
+		syscall.Wait4(int(id), &wstatus, 0, nil)
 
-        return int(wstatus.ExitStatus()), nil
-    }
+		return int(wstatus.ExitStatus()), nil
+	}
 
-    // Add the config path
-    args = append(args, "--config='"+r.config.GetRClonePath()+"'")
+	// Add the config path
+	args = append(args, "--config='"+r.config.GetRClonePath()+"'")
 
-    if err := execveAt(r.fd, args); err != nil {
-        return -1, err
-    }
+	if err := execveAt(r.fd, args); err != nil {
+		return -1, err
+	}
 
-    // Should never reach
-    log.Println("Unreachable statement in Rclone.Run")
-    return -1, nil
+	// Should never reach
+	log.Println("Unreachable statement in Rclone.Run")
+	return -1, nil
 }
-
