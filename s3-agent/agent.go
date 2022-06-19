@@ -9,6 +9,8 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/blang/semver"
 	"github.com/rhysd/go-github-selfupdate/selfupdate"
+	"github.com/alecthomas/kong"
+    "github.com/hanwen/go-fuse/v2/fs"
 )
 
 const version = "0.0.1"
@@ -63,7 +65,30 @@ func doSelfUpdate() {
 
 func main() {
     doSelfUpdate()
-    ctx := kong.Parse(&cli)
+
+    loopbackRoot, err := NewLoopbackRoot("./tmp")
+	if err != nil {
+		log.Fatalf("NewLoopbackRoot(%s): %v\n", "./tmp", err)
+	}
+
+    opts := &fs.Options{}
+
+	opts.MountOptions.Options = append(opts.MountOptions.Options, "default_permissions")
+	// First column in "df -T": original dir
+	opts.MountOptions.Options = append(opts.MountOptions.Options, "fsname=hello")
+	// Second column in "df -T" will be shown as "fuse." + Name
+	opts.MountOptions.Name = "loopback"
+	// Leave file permissions on "000" files as-is
+	opts.NullPermissions = true
+
+	server, err := fs.Mount("./hello", loopbackRoot, opts)
+	if err != nil {
+		log.Fatalf("Mount fail: %v\n", err)
+	}
+
+    server.Wait()
+
+	ctx := kong.Parse(&cli)
 	err := ctx.Run(&Context{Debug: cli.Debug})
 	ctx.FatalIfErrorf(err)
 }
