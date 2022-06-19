@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"syscall"
+    "log"
+    "github.com/eliottness/s3-agent/s3fuse"
 
 	"github.com/alecthomas/kong"
 	"github.com/blang/semver"
@@ -66,7 +68,7 @@ func doSelfUpdate() {
 func main() {
     doSelfUpdate()
 
-    loopbackRoot, err := NewLoopbackRoot("./tmp")
+    loopbackRoot, err := s3fuse.NewS3Root("./tmp")
 	if err != nil {
 		log.Fatalf("NewLoopbackRoot(%s): %v\n", "./tmp", err)
 	}
@@ -89,6 +91,6 @@ func main() {
     server.Wait()
 
 	ctx := kong.Parse(&cli)
-	err := ctx.Run(&Context{Debug: cli.Debug})
+	err = ctx.Run(&Context{Debug: cli.Debug})
 	ctx.FatalIfErrorf(err)
 }

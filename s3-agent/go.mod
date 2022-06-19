@@ -1,4 +1,4 @@
-module github/eliottness/s3-wizard
+module github.com/eliottness/s3-agent
 
 go 1.18
 
