@@ -36,7 +36,7 @@ func (n *S3Node) renameExchange(name string, newparent InodeEmbedder, newName st
 	return syscall.ENOSYS
 }
 
-func (f *loopbackFile) Allocate(ctx context.Context, off uint64, sz uint64, mode uint32) syscall.Errno {
+func (f *S3File) Allocate(ctx context.Context, off uint64, sz uint64, mode uint32) syscall.Errno {
 	// TODO: Handle `mode` parameter.
 
 	// From `man fcntl` on OSX:
@@ -98,7 +98,7 @@ func timeToTimeval(t *time.Time) syscall.Timeval {
 
 // MacOS before High Sierra lacks utimensat() and UTIME_OMIT.
 // We emulate using utimes() and extra Getattr() calls.
-func (f *loopbackFile) utimens(a *time.Time, m *time.Time) syscall.Errno {
+func (f *S3File) utimens(a *time.Time, m *time.Time) syscall.Errno {
 	var attr fuse.AttrOut
 	if a == nil || m == nil {
 		errno := f.Getattr(context.Background(), &attr)
