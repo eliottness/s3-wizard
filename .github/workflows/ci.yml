@@ -23,7 +23,7 @@ jobs:
       run: cd s3-agent && go mod verify
 
     - name: Build
-      run: cd s3-agent && go build -v
+      run: cd s3-agent && make rclone && go build -v
 
     - name: Run go vet
       run: cd s3-agent && go vet
