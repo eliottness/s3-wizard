@@ -1,8 +1,10 @@
+//go:build linux
+// +build linux
 // Copyright 2019 the Go-FUSE Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package s3fuse
+package main
 
 import (
 	"context"
@@ -14,13 +16,14 @@ import (
 )
 
 func (f *S3File) Allocate(ctx context.Context, off uint64, sz uint64, mode uint32) syscall.Errno {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+    if err := f.root.fs.Download(f.Path); err != nil {
+        return fs.ToErrno(err)
+    }
 
-    // TODO
-    // if isremote && isfile, download the file and update the db about the file location + delete on the S3
+	f.Mutex.Lock()
+	defer f.Mutex.Unlock()
 
-	err := syscall.Fallocate(f.fd, mode, int64(off), int64(sz))
+	err := syscall.Fallocate(f.Fd, mode, int64(off), int64(sz))
 	if err != nil {
 		return fs.ToErrno(err)
 	}
@@ -32,7 +35,7 @@ func (f *S3File) utimens(a *time.Time, m *time.Time) syscall.Errno {
 	var ts [2]syscall.Timespec
 	ts[0] = fuse.UtimeToTimespec(a)
 	ts[1] = fuse.UtimeToTimespec(m)
-	err := futimens(int(f.fd), &ts)
+	err := futimens(int(f.Fd), &ts)
 	return fs.ToErrno(err)
 }
 

@@ -11,8 +11,11 @@ require github.com/rhysd/go-github-selfupdate v1.2.2
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
+	github.com/google/uuid v1.3.0
 	golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a
 	gopkg.in/ini.v1 v1.66.6
+	gorm.io/driver/sqlite v1.3.4
+	gorm.io/gorm v1.23.6
 )
 
 require (
@@ -30,6 +33,4 @@ require (
 	golang.org/x/net v0.0.0-20190311183353-d8887717615a // indirect
 	golang.org/x/oauth2 v0.0.0-20181106182150-f42d05182288 // indirect
 	google.golang.org/appengine v1.3.0 // indirect
-	gorm.io/driver/sqlite v1.3.4 // indirect
-	gorm.io/gorm v1.23.6 // indirect
 )

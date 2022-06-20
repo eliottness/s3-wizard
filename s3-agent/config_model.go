@@ -1,7 +1,5 @@
 package main
 
-import "net/url"
-
 const (
 	// Basic rule, when the file is updated, send it to the backend
 	// no parameters
@@ -33,11 +31,11 @@ type RuleType string
 
 type ValueTypeParamater struct {
 	// must be positive
-	value int
+	Value int       `json:"value"`
 	// can be:
 	// * years, months, weeks, days, hours, minutes, seconds    -> time rules
 	// * To, Go, Mo, Ko                                         -> size rules
-	unit string
+	Unit string     `json:"unit"`
 }
 
 type Rule struct {

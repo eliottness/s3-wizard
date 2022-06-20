@@ -1,4 +1,4 @@
-package s3fuse
+package main
 
 import (
 	"syscall"

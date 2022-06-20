@@ -1,52 +1,101 @@
 package main
 
 import (
+	"os"
+
+	"github.com/google/uuid"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
+/// The database table for the file entries
 type S3NodeTable struct {
-	Ino     uint64 `gorm:"primaryKey"`
-	Size    uint64
+	Path    string `gorm:"primaryKey"`
+	Size    int64
 	IsLocal bool
-	Uuid    string
+	UUID    string
 	Server  string
 }
 
+/// Needed to link the local loopback filesystem
+/// with the one we will mount
+type S3Rule struct {
+	UUID string
+	Path string `gorm:"primaryKey"`
+}
+
+/// Migrate at start up
+func DBSanitize(config *ConfigPath) {
+	db := Open(config)
+	db.AutoMigrate(&S3NodeTable{})
+	db.AutoMigrate(&S3Rule{})
+    os.Chmod(config.GetDBPath(), 0600)
+}
+
+/// Open a connection with the database
 func Open(config *ConfigPath) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(config.GetDBPath()), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
 
-	db.AutoMigrate(&S3NodeTable{})
 	return db
 }
 
-func GetEntry(db *gorm.DB, ino uint64) *S3NodeTable {
+/// Returns a file entry from the database
+func GetEntry(db *gorm.DB, path string) *S3NodeTable {
 	var entry S3NodeTable
-	db.Where("Ino = ?", ino).First(&entry)
+	db.Where("Path = ?", path).First(&entry)
 	return &entry
 }
 
-func NewEntry(ino uint64, size uint64, isLocal bool, uuid string, server string) *S3NodeTable {
+/// Adds a file entry to the database
+func NewEntry(path string, size int64) *S3NodeTable {
 	return &S3NodeTable{
-		Ino:     ino,
+		Path:    path,
 		Size:    size,
-		IsLocal: isLocal,
-		Uuid:    uuid,
-		Server:  server,
+		IsLocal: true,
+		UUID:    uuid.New().String(),
+		Server:  "",
 	}
 }
 
+/// Tell the DB that the file is remote now
 func SendToServer(db *gorm.DB, entry *S3NodeTable, server string) {
 	db.Model(entry).Update("Server", server).Update("IsLocal", false)
 }
 
-func DeleteEntry(db *gorm.DB, entry *S3NodeTable) {
-	db.Delete(entry, entry.Ino)
+func IsEntryLocal(db *gorm.DB, path string) bool {
+	var entry []S3NodeTable
+	db.Where("Path = ?", path).Limit(1).Find(&entry)
+	return len(entry) == 0 || entry[0].IsLocal
 }
 
-func RetriveFromServer(db *gorm.DB, entry *S3NodeTable, server string) {
-	db.Model(entry).Update("Server", nil).Update("IsLocal", true)
+/// Remove file entry from the database
+func DeleteEntry(db *gorm.DB, entry *S3NodeTable) {
+	db.Delete(entry.Path)
+}
+
+func RenameEntry(db *gorm.DB, oldPath, newPath string) {
+	db.Model(&S3NodeTable{}).Where("Path = ?", oldPath).Update("Path", newPath)
+}
+
+/// Tell the DB that the file is local now
+func RetriveFromServer(db *gorm.DB, entry *S3NodeTable) {
+	db.Model(entry).Update("Server", "").Update("IsLocal", true)
+}
+
+func GetRule(db *gorm.DB, path string) *S3Rule {
+	var rule S3Rule
+	db.Where("Path = ?", path).First(&rule)
+	return &rule
+}
+
+func AddIfNotExistsRule(db *gorm.DB, path string) *S3Rule {
+	rule := S3Rule{
+		Path: path,
+		UUID: uuid.New().String(),
+	}
+	db.Where("Path = ?", path).FirstOrCreate(&rule)
+	return &rule
 }

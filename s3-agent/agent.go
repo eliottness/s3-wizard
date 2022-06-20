@@ -2,18 +2,20 @@ package main
 
 import (
 	"fmt"
-	"github.com/eliottness/s3-agent/s3fuse"
 	"log"
 	"os"
 	"syscall"
 
 	"github.com/alecthomas/kong"
 	"github.com/blang/semver"
-	"github.com/hanwen/go-fuse/v2/fs"
 	"github.com/rhysd/go-github-selfupdate/selfupdate"
 )
 
 const version = "0.0.1"
+
+type S3Agent struct {
+
+}
 
 type Context struct {
 	Debug bool
@@ -57,6 +59,7 @@ func doSelfUpdate() {
 	} else {
 		log.Println("Successfully updated to version", latest.Version)
 		log.Println("Release note:\n", latest.ReleaseNotes)
+        // Restart itself
 		if err := syscall.Exec(os.Args[0], os.Args, os.Environ()); err != nil {
 			log.Println(err)
 		}
@@ -66,32 +69,14 @@ func doSelfUpdate() {
 func main() {
 	doSelfUpdate()
 
-	loopbackRoot, err := s3fuse.NewS3Root("./tmp")
-	if err != nil {
-		log.Fatalf("NewLoopbackRoot(%s): %v\n", "./tmp", err)
-	}
 
-	opts := &fs.Options{}
+    config := NewConfigPath(nil)
+    DBSanitize(config)
 
-	opts.MountOptions.Options = append(opts.MountOptions.Options, "default_permissions")
-	// First column in "df -T": original dir
-	opts.MountOptions.Options = append(opts.MountOptions.Options, "fsname=hello")
-	// Second column in "df -T" will be shown as "fuse." + Name
-	opts.MountOptions.Name = "loopback"
-	// Leave file permissions on "000" files as-is
-	opts.NullPermissions = true
-
-	opts.MountOptions.EnableLocks = false
-	opts.MountOptions.Debug = true
-
-	server, err := fs.Mount("./hello", loopbackRoot, opts)
-	if err != nil {
-		log.Fatalf("Mount fail: %v\n", err)
-	}
-
-	server.Wait()
+    fs := NewS3FS("./tmp", "./hello", config)
+    fs.Run(false)
 
 	ctx := kong.Parse(&cli)
-	err = ctx.Run(&Context{Debug: cli.Debug})
+	err := ctx.Run(&Context{Debug: cli.Debug})
 	ctx.FatalIfErrorf(err)
 }

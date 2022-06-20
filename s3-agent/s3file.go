@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package s3fuse
+package main
 
 import (
 	"context"
@@ -21,13 +21,25 @@ import (
 // operations are implemented. When using the Fd from a *os.File, call
 // syscall.Dup() on the fd, to avoid os.File's finalizer from closing
 // the file descriptor.
-func NewLoopbackFile(fd int) fs.FileHandle {
-	return &S3File{fd: fd}
+func NewS3File(root *S3Root, fd int, path string, flags uint32) *S3File {
+	return &S3File{root: root, Fd: fd, Path: path, Flags: flags}
 }
 
 type S3File struct {
-	mu sync.Mutex
-	fd int
+    // Mutex on operations
+	Mutex       sync.Mutex
+
+    // The root of the filesystem
+    root        *S3Root
+
+    // The file descriptor (or -1 of there is none)
+	Fd          int
+
+    // The path of the file
+    Path        string
+
+    // Opening flags in case we have to reopen it
+    Flags       uint32
 }
 
 var _ = (fs.FileHandle)((*S3File)(nil))
@@ -47,46 +59,55 @@ var _ = (fs.FileAllocater)((*S3File)(nil))
 // var _ = (fs.FileSetlkwer)((*S3File)(nil))
 
 func (f *S3File) Read(ctx context.Context, buf []byte, off int64) (res fuse.ReadResult, errno syscall.Errno) {
-	// TODO
-	// if isremote && isfile, download the file and update the db about the file location + delete on the S3
-	// then replace the file descriptor with the new file descriptor
 
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	r := fuse.ReadResultFd(uintptr(f.fd), off, len(buf))
+    // The user asked the real data, we need to download the file or verify the cache
+    if err := f.root.fs.Download(f.Path); err != nil {
+        return nil, fs.ToErrno(err)
+    }
+
+	f.Mutex.Lock()
+	defer f.Mutex.Unlock()
+	r := fuse.ReadResultFd(uintptr(f.Fd), off, len(buf))
 	return r, fs.OK
 }
 
 func (f *S3File) Write(ctx context.Context, data []byte, off int64) (uint32, syscall.Errno) {
-	// TODO
-	// if isremote && isfile, download the file and update the db about the file location + delete on the S3
-	// then replace the file descriptor with the new file descriptor
 
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	n, err := syscall.Pwrite(f.fd, data, off)
+    // The user asked the real data, we need to download the file or verify the cache
+    if err := f.root.fs.Download(f.Path); err != nil {
+        return 0, fs.ToErrno(err)
+    }
+
+	f.Mutex.Lock()
+	defer f.Mutex.Unlock()
+	n, err := syscall.Pwrite(f.Fd, data, off)
 	return uint32(n), fs.ToErrno(err)
 }
 
 func (f *S3File) Release(ctx context.Context) syscall.Errno {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.fd != -1 {
-		err := syscall.Close(f.fd)
-		f.fd = -1
+	f.Mutex.Lock()
+	defer f.Mutex.Unlock()
+	if f.Fd != -1 {
+
+        if err := f.root.fs.UnregisterFH(f); err != nil {
+            return fs.ToErrno(err)
+        }
+
+		err := syscall.Close(f.Fd)
+		f.Fd = -1
 		return fs.ToErrno(err)
 	}
 	return syscall.EBADF
 }
 
 func (f *S3File) Flush(ctx context.Context) syscall.Errno {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+	f.Mutex.Lock()
+	defer f.Mutex.Unlock()
 
 	// Since Flush() may be called for each dup'd fd, we don't
 	// want to really close the file, we just want to flush. This
 	// is achieved by closing a dup'd fd.
-	newFd, err := syscall.Dup(f.fd)
+	newFd, err := syscall.Dup(f.Fd)
 
 	if err != nil {
 		return fs.ToErrno(err)
@@ -96,9 +117,9 @@ func (f *S3File) Flush(ctx context.Context) syscall.Errno {
 }
 
 func (f *S3File) Fsync(ctx context.Context, flags uint32) (errno syscall.Errno) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	r := fs.ToErrno(syscall.Fsync(f.fd))
+	f.Mutex.Lock()
+	defer f.Mutex.Unlock()
+	r := fs.ToErrno(syscall.Fsync(f.Fd))
 
 	return r
 }
@@ -112,11 +133,11 @@ func (f *S3File) Setattr(ctx context.Context, in *fuse.SetAttrIn, out *fuse.Attr
 }
 
 func (f *S3File) setAttr(ctx context.Context, in *fuse.SetAttrIn) syscall.Errno {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+	f.Mutex.Lock()
+	defer f.Mutex.Unlock()
 	var errno syscall.Errno
 	if mode, ok := in.GetMode(); ok {
-		errno = fs.ToErrno(syscall.Fchmod(f.fd, mode))
+		errno = fs.ToErrno(syscall.Fchmod(f.Fd, mode))
 		if errno != 0 {
 			return errno
 		}
@@ -134,7 +155,7 @@ func (f *S3File) setAttr(ctx context.Context, in *fuse.SetAttrIn) syscall.Errno 
 		if gOk {
 			gid = int(gid32)
 		}
-		errno = fs.ToErrno(syscall.Fchown(f.fd, uid, gid))
+		errno = fs.ToErrno(syscall.Fchown(f.Fd, uid, gid))
 		if errno != 0 {
 			return errno
 		}
@@ -159,12 +180,13 @@ func (f *S3File) setAttr(ctx context.Context, in *fuse.SetAttrIn) syscall.Errno 
 	}
 
 	if sz, ok := in.GetSize(); ok {
-		// TODO
-		// User asked to truncate the file
-		// if isremote && isfile, download the file and update the db about the file location + delete on the S3
-		// then replace the file descriptor with the new file descriptor
 
-		errno = fs.ToErrno(syscall.Ftruncate(f.fd, int64(sz)))
+        // The user ask to truncate the file, so we need to download the file.
+        if err := f.root.fs.Download(f.Path); err != nil {
+            return fs.ToErrno(err)
+        }
+
+		errno = fs.ToErrno(syscall.Ftruncate(f.Fd, int64(sz)))
 		if errno != 0 {
 			return errno
 		}
@@ -173,16 +195,21 @@ func (f *S3File) setAttr(ctx context.Context, in *fuse.SetAttrIn) syscall.Errno 
 }
 
 func (f *S3File) Getattr(ctx context.Context, a *fuse.AttrOut) syscall.Errno {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+	f.Mutex.Lock()
+	defer f.Mutex.Unlock()
 	st := syscall.Stat_t{}
-	err := syscall.Fstat(f.fd, &st)
+	err := syscall.Fstat(f.Fd, &st)
 	if err != nil {
 		return fs.ToErrno(err)
 	}
 
-	// TODO
-	// if isremote && isfile, set the size of the file to the good size in db
+    // We have to get the fake size of the file
+    size, err := f.root.fs.GetSize(f.Path)
+    if err != nil {
+        return fs.ToErrno(err)
+    }
+
+    st.Size = size
 
 	a.FromStat(&st)
 
@@ -190,13 +217,13 @@ func (f *S3File) Getattr(ctx context.Context, a *fuse.AttrOut) syscall.Errno {
 }
 
 func (f *S3File) Lseek(ctx context.Context, off uint64, whence uint32) (uint64, syscall.Errno) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+    if err := f.root.fs.Download(f.Path); err != nil {
+        return 0, fs.ToErrno(err)
+    }
 
-	// TODO
-	// if isremote && isfile, download the file and update the db about the file location + delete on the S3
-	// then replace the file descriptor with the new file descriptor
+	f.Mutex.Lock()
+	defer f.Mutex.Unlock()
 
-	n, err := unix.Seek(f.fd, int64(off), int(whence))
+	n, err := unix.Seek(f.Fd, int64(off), int(whence))
 	return uint64(n), fs.ToErrno(err)
 }

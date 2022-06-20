@@ -70,9 +70,13 @@ func getConfigDir() string {
 		if home == "" {
 			home = os.Getenv("USERPROFILE")
 		}
-	} else if runtime.GOOS == "linux" {
+	}
+
+    if home == "" || runtime.GOOS == "linux" {
 		home = os.Getenv("XDG_CONFIG_HOME")
-	} else {
+	}
+
+    if home == "" {
 		home = os.Getenv("HOME")
 	}
 
