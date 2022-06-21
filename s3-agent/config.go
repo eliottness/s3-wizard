@@ -8,18 +8,18 @@ import (
 	"gopkg.in/ini.v1"
 )
 
-const CONFIG_FOLDER = ".s3-agent"
+const configFolder = ".s3-agent"
 
 type ConfigPath struct {
 	folder string
 }
 
-func NewConfigPath(user_specified *string) *ConfigPath {
+func NewConfigPath(userSpecifiedOne *string) *ConfigPath {
 	var configDir string
-	if user_specified == nil {
+	if userSpecifiedOne == nil || *userSpecifiedOne == "" {
 		configDir = getConfigDir()
 	} else {
-		configDir = *user_specified
+		configDir = *userSpecifiedOne
 	}
 
 	if _, err := os.Stat(configDir); os.IsNotExist(err) {
@@ -46,8 +46,8 @@ func (c *ConfigPath) GetRClonePath() string {
 	return filepath.Join(c.folder, "rclone.conf.tmp")
 }
 
-func (c *ConfigPath) GetAgentPath() string {
-	return filepath.Join(c.folder, "agent.conf")
+func (c *ConfigPath) GetAgentConfigPath() string {
+	return filepath.Join(c.folder, "config.json")
 }
 
 func (c *ConfigPath) GetAgentLogPath() string {
@@ -60,6 +60,18 @@ func (c *ConfigPath) GetAgentPidPath() string {
 
 func (c *ConfigPath) GetDBPath() string {
 	return filepath.Join(c.folder, "sqlite.db")
+}
+
+func (c *ConfigPath) GetLoopbackFSPath(uuid string) string {
+    ruleFolder := filepath.Join(c.folder, uuid)
+
+    if fo, err := os.Stat(ruleFolder); err != nil || !fo.IsDir() {
+        if err = os.Mkdir(ruleFolder, 0700); err != nil {
+            panic(err)
+        }
+    }
+
+    return ruleFolder
 }
 
 func getConfigDir() string {
@@ -84,5 +96,5 @@ func getConfigDir() string {
 		panic("No home directory found")
 	}
 
-	return filepath.Join(home, CONFIG_FOLDER)
+	return filepath.Join(home, configFolder)
 }

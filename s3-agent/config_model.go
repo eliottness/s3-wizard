@@ -1,5 +1,11 @@
 package main
 
+import (
+    "os"
+    "encoding/json"
+    "fmt"
+)
+
 const (
 	// Basic rule, when the file is updated, send it to the backend
 	// no parameters
@@ -45,7 +51,7 @@ type Rule struct {
 	// paramaters for the rule
 	Params interface{} `json:"params"`
 
-	// source path: can be a file or a folder in the local filesystem
+	// source path: a folder in the local filesystem
 	// if the source is a file, apply the rule
 	// if the source is a folder, apply the rule on all its files
 	// support shell globbing
@@ -56,8 +62,74 @@ type Rule struct {
 }
 
 type Config struct {
-	Servers         map[string]string            `json:"servers"`          // servers to connect to
-	Rules           []Rule                       `json:"rules"`            // rules to apply
-	ExcludePatterns []string                     `json:"exclude_patterns"` // exclude files matching this paterns
-	RCloneConfig    map[string]map[string]string `json:"rclone_config"`    // Embedded rclone ini config
+	Servers         []string                        `json:"servers"`          // servers to connect to
+	Rules           []Rule                          `json:"rules"`            // rules to apply
+	ExcludePatterns []string                        `json:"exclude-patterns"` // exclude files matching this paterns
+	RCloneConfig    map[string]map[string]string    `json:"rclone-config"`    // Embedded rclone ini config
+}
+
+func LoadConfig(path string) (*Config, error) {
+    file, err := os.Open(path)
+    if err != nil {
+        return nil, err
+    }
+
+    var config Config
+    err = json.NewDecoder(file).Decode(&config)
+    if err != nil {
+        return nil, err
+    }
+
+    if err := config.IsValid(); err != nil {
+        return nil, err
+    }
+
+    return &config, nil
+}
+
+func SaveConfig(path string, config *Config) error {
+    file, err := os.Create(path)
+    if err != nil {
+        return err
+    }
+    defer file.Close()
+
+    err = json.NewEncoder(file).Encode(config)
+    if err != nil {
+        return err
+    }
+    return nil
+}
+
+func (config *Config) IsValid() error {
+
+    for _, rule := range config.Rules {
+        if err := rule.IsValid(); err != nil {
+            return err
+        }
+    }
+
+    if len(config.Servers) == 0 {
+        return fmt.Errorf("No server specified")
+    }
+
+    if len(config.Rules) == 0 {
+        return fmt.Errorf("No rule specified")
+    }
+
+    if len(config.Rules) > 1 {
+        return fmt.Errorf("Only one rule is supported in this version, please upgrade by restarting the agent")
+    }
+
+    return nil
+}
+
+func (rule *Rule) IsValid() error {
+
+    if fo, err := os.Stat(rule.Src); err != nil || !fo.IsDir() {
+        fmt.Println("Invalid source:", rule.Src)
+        return err
+    }
+
+    return nil
 }
