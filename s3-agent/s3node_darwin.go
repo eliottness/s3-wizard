@@ -1,4 +1,5 @@
 // go:build darwin
+//go:build darwin
 // +build darwin
 
 // Copyright 2019 the Go-FUSE Authors. All rights reserved.

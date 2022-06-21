@@ -1,5 +1,6 @@
 //go:build linux
 // +build linux
+
 // Copyright 2019 the Go-FUSE Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
@@ -16,9 +17,9 @@ import (
 )
 
 func (f *S3File) Allocate(ctx context.Context, off uint64, sz uint64, mode uint32) syscall.Errno {
-    if err := f.root.fs.Download(f.Path); err != nil {
-        return fs.ToErrno(err)
-    }
+	if err := f.root.fs.Download(f.Path); err != nil {
+		return fs.ToErrno(err)
+	}
 
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()

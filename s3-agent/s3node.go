@@ -25,7 +25,7 @@ type S3Root struct {
 	// the underlying filesystem crosses file systems.
 	Dev uint64
 
-    fs *S3FS
+	fs *S3FS
 }
 
 func (r *S3Root) newNode(parent *fs.Inode, name string, st *syscall.Stat_t) fs.InodeEmbedder {
@@ -63,7 +63,6 @@ type S3Node struct {
 	// RootData points back to the root of the S3 filesystem.
 	RootData *S3Root
 }
-
 
 func (n *S3Node) Statfs(ctx context.Context, out *fuse.StatfsOut) syscall.Errno {
 	s := syscall.Statfs_t{}
@@ -160,33 +159,32 @@ func (n *S3Node) Rmdir(ctx context.Context, name string) syscall.Errno {
 
 func (n *S3Node) Unlink(ctx context.Context, name string) syscall.Errno {
 	p := filepath.Join(n.path(), name)
-    if err := n.RootData.fs.Unlink(p); err != nil {
-        return fs.ToErrno(err)
-    }
+	if err := n.RootData.fs.Unlink(p); err != nil {
+		return fs.ToErrno(err)
+	}
 
 	err := syscall.Unlink(p)
 	return fs.ToErrno(err)
 }
 
 func (n *S3Node) Rename(ctx context.Context, name string, newParent fs.InodeEmbedder, newName string, flags uint32) syscall.Errno {
-	if flags & 0x02 != 0 {
+	if flags&0x02 != 0 {
 		return n.renameExchange(name, newParent, newName)
 	}
 
 	p1 := filepath.Join(n.path(), name)
 	p2 := filepath.Join(n.RootData.Path, newParent.EmbeddedInode().Path(nil), newName)
 
-    if err := n.RootData.fs.Rename(p1, p2); err != nil {
-        return fs.ToErrno(err)
-    }
+	if err := n.RootData.fs.Rename(p1, p2); err != nil {
+		return fs.ToErrno(err)
+	}
 
 	err := syscall.Rename(p1, p2)
 	return fs.ToErrno(err)
 }
 
-
 func (n *S3Node) Create(ctx context.Context, name string, flags uint32, mode uint32, out *fuse.EntryOut) (inode *fs.Inode, fh fs.FileHandle, fuseFlags uint32, errno syscall.Errno) {
-    p := filepath.Join(n.path(), name)
+	p := filepath.Join(n.path(), name)
 	flags = flags &^ syscall.O_APPEND
 	fd, err := syscall.Open(p, int(flags)|os.O_CREATE, mode)
 	if err != nil {
@@ -203,9 +201,9 @@ func (n *S3Node) Create(ctx context.Context, name string, flags uint32, mode uin
 	ch := n.NewInode(ctx, node, n.RootData.idFromStat(&st))
 	lf := NewS3File(n.RootData, fd, p, flags)
 
-    if err := n.RootData.fs.Create(lf); err != nil {
-        return  nil, nil, 0, fs.ToErrno(err)
-    }
+	if err := n.RootData.fs.Create(lf); err != nil {
+		return nil, nil, 0, fs.ToErrno(err)
+	}
 
 	out.FromStat(&st)
 	return ch, lf, 0, 0
@@ -252,9 +250,9 @@ func (n *S3Node) Link(ctx context.Context, target fs.InodeEmbedder, name string,
 func (n *S3Node) Readlink(ctx context.Context) ([]byte, syscall.Errno) {
 	p := n.path()
 
-    if err := n.RootData.fs.Download(p); err != nil {
-        return nil, fs.ToErrno(err)
-    }
+	if err := n.RootData.fs.Download(p); err != nil {
+		return nil, fs.ToErrno(err)
+	}
 
 	for l := 256; ; l *= 2 {
 		buf := make([]byte, l)
@@ -279,9 +277,9 @@ func (n *S3Node) Open(ctx context.Context, flags uint32) (fh fs.FileHandle, fuse
 	}
 	lf := NewS3File(n.RootData, f, p, flags)
 
-    if err := n.RootData.fs.RegisterFH(lf); err != nil {
-        return nil, 0, fs.ToErrno(err)
-    }
+	if err := n.RootData.fs.RegisterFH(lf); err != nil {
+		return nil, 0, fs.ToErrno(err)
+	}
 
 	return lf, 0, 0
 }
@@ -314,18 +312,17 @@ func (n *S3Node) Getattr(ctx context.Context, f fs.FileHandle, out *fuse.AttrOut
 		err = syscall.Lstat(p, &st)
 	}
 
-    // Add the fake size
-    size, err := n.RootData.fs.GetSize(p)
-    if err != nil {
-        return fs.ToErrno(err)
-    }
+	// Add the fake size
+	size, err := n.RootData.fs.GetSize(p)
+	if err != nil {
+		return fs.ToErrno(err)
+	}
 
-    st.Size = size
+	st.Size = size
 
 	out.FromStat(&st)
 	return fs.OK
 }
-
 
 func (n *S3Node) Setattr(ctx context.Context, f fs.FileHandle, in *fuse.SetAttrIn, out *fuse.AttrOut) syscall.Errno {
 	p := n.path()
@@ -378,9 +375,10 @@ func (n *S3Node) Setattr(ctx context.Context, f fs.FileHandle, in *fuse.SetAttrI
 		}
 
 		if sz, ok := in.GetSize(); ok {
-            if err := n.RootData.fs.Download(p); err != nil {
-                return fs.ToErrno(err)
-            }
+			// The user ask to truncate the file, so we need to download the file.
+			if err := n.RootData.fs.Download(p); err != nil {
+				return fs.ToErrno(err)
+			}
 
 			if err := syscall.Truncate(p, int64(sz)); err != nil {
 				return fs.ToErrno(err)
@@ -415,7 +413,7 @@ func NewS3Root(rootPath string, fs *S3FS) (fs.InodeEmbedder, error) {
 	root := &S3Root{
 		Path: rootPath,
 		Dev:  uint64(st.Dev),
-        fs:   fs,
+		fs:   fs,
 	}
 
 	return root.newNode(nil, "", &st), nil

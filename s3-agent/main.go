@@ -14,8 +14,8 @@ import (
 const version = "0.0.1"
 
 type Context struct {
-	Debug bool
-    ConfigPath *ConfigPath
+	Debug      bool
+	ConfigPath *ConfigPath
 }
 
 type SendCmd struct {
@@ -24,54 +24,62 @@ type SendCmd struct {
 }
 
 type SyncCmd struct {
-    ConfigPath     string `help:"Path to the agent config folder." type:"path"`
+	LoopbackPath string `help:"Path to underlying filesystem." type:"path"`
 }
 
 func (cmd *SyncCmd) Run(ctx *Context) error {
-    fmt.Println("Sync", cmd.ConfigPath)
 
 	doSelfUpdate()
 
-    DBSanitize(ctx.ConfigPath)
+	DBSanitize(ctx.ConfigPath)
 
-    config, err := LoadConfig(ctx.ConfigPath.GetAgentConfigPath())
-    if err != nil {
-        return err
+	config, err := LoadConfig(ctx.ConfigPath.GetAgentConfigPath())
+	if err != nil {
+		return err
+	}
+
+	ctx.ConfigPath.WriteRCloneConfig(config.RCloneConfig)
+
+	rule := config.Rules[0]
+	db := Open(ctx.ConfigPath)
+	dbEntry := AddIfNotExistsRule(db, rule.Src)
+	loopback := ctx.ConfigPath.GetLoopbackFSPath(dbEntry.UUID)
+
+    if !IsDirectory(rule.Src) {
+        if err := os.Mkdir(rule.Src, 755); err != nil {
+            return err
+        }
     }
 
-    rule := config.Rules[0]
-    db := Open(ctx.ConfigPath)
-    dbEntry := AddIfNotExistsRule(db, rule.Src)
-    loopback := ctx.ConfigPath.GetLoopbackFSPath(dbEntry.UUID)
-    fs := NewS3FS(loopback, rule.Src, ctx.ConfigPath)
-    return fs.Run(ctx.Debug)
+	fs := NewS3FS(loopback, rule.Src, ctx.ConfigPath)
+	return fs.Run(ctx.Debug)
 }
 
 type ConfigCmd struct {
-    Import  ImportConfigCmd `cmd:"" name:"import" help:"Import the config."`
+	Import ImportConfigCmd `cmd:"" name:"import" help:"Import the config."`
 }
 
 type ImportConfigCmd struct {
-    ConfigPath string `arg:"" name:"configPath" help:"Path to the agent config file." type:"path"`
+	ConfigPath string `arg:"" name:"configPath" help:"Path to the agent config file." type:"path"`
 }
 
 func (cmd *ImportConfigCmd) Run(ctx *Context) error {
-    fmt.Println("Import", cmd.ConfigPath)
+	fmt.Println("Import", cmd.ConfigPath)
 
-    config, err := LoadConfig(cmd.ConfigPath)
-    if err != nil {
-        log.Fatalln(err)
-    }
+	config, err := LoadConfig(cmd.ConfigPath)
+	if err != nil {
+		log.Fatalln(err)
+	}
 
-    err = SaveConfig(ctx.ConfigPath.GetAgentConfigPath(), config)
+	err = SaveConfig(ctx.ConfigPath.GetAgentConfigPath(), config)
 	return nil
 }
 
 type CLI struct {
-	Debug           bool      `help:"Enable debug mode."`
-    ConfigFolder    string    `help:"Path to the agent config folder."`
-	Sync            SyncCmd   `cmd:"" name:"sync" help:"Run the sync daemon."`
-	Config          ConfigCmd `cmd:"" name:"config" help:"Manage the config."`
+	Debug        bool      `help:"Enable debug mode."`
+	ConfigFolder string    `help:"Path to the agent config folder."`
+	Sync         SyncCmd   `cmd:"" name:"sync" help:"Run the sync daemon."`
+	Config       ConfigCmd `cmd:"" name:"config" help:"Manage the config."`
 }
 
 func doSelfUpdate() {
@@ -86,8 +94,8 @@ func doSelfUpdate() {
 	} else {
 		log.Println("Successfully updated to version", latest.Version)
 		log.Println("Release note:\n", latest.ReleaseNotes)
-        log.Println("Restarting...")
-        // Restart itself
+		log.Println("Restarting...")
+		// Restart itself
 		if err := syscall.Exec(os.Args[0], os.Args, os.Environ()); err != nil {
 			log.Println(err)
 		}
@@ -96,10 +104,10 @@ func doSelfUpdate() {
 
 func main() {
 
-    cli := &CLI{
-        Debug: false,
-        ConfigFolder: "",
-    }
+	cli := &CLI{
+		Debug:        false,
+		ConfigFolder: "",
+	}
 	ctx := kong.Parse(cli)
 	err := ctx.Run(&Context{Debug: cli.Debug, ConfigPath: NewConfigPath(&cli.ConfigFolder)})
 	ctx.FatalIfErrorf(err)

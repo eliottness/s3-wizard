@@ -38,7 +38,11 @@ func (c *ConfigPath) WriteRCloneConfig(config map[string]map[string]string) erro
 			s.Key(key).SetValue(value)
 		}
 	}
-	return cfg.SaveTo(c.GetRClonePath())
+	if err := cfg.SaveTo(c.GetRClonePath()); err != nil {
+        return err
+    }
+
+    return os.Chmod(c.GetRClonePath(), 600)
 }
 
 func (c *ConfigPath) GetRClonePath() string {
@@ -63,15 +67,15 @@ func (c *ConfigPath) GetDBPath() string {
 }
 
 func (c *ConfigPath) GetLoopbackFSPath(uuid string) string {
-    ruleFolder := filepath.Join(c.folder, uuid)
+	ruleFolder := filepath.Join(c.folder, uuid)
 
-    if fo, err := os.Stat(ruleFolder); err != nil || !fo.IsDir() {
-        if err = os.Mkdir(ruleFolder, 0700); err != nil {
-            panic(err)
-        }
-    }
+	if !IsDirectory(ruleFolder) {
+		if err := os.Mkdir(ruleFolder, 0700); err != nil {
+			panic(err)
+		}
+	}
 
-    return ruleFolder
+	return ruleFolder
 }
 
 func getConfigDir() string {
@@ -84,11 +88,11 @@ func getConfigDir() string {
 		}
 	}
 
-    if home == "" || runtime.GOOS == "linux" {
+	if home == "" || runtime.GOOS == "linux" {
 		home = os.Getenv("XDG_CONFIG_HOME")
 	}
 
-    if home == "" {
+	if home == "" {
 		home = os.Getenv("HOME")
 	}
 

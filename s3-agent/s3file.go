@@ -26,20 +26,20 @@ func NewS3File(root *S3Root, fd int, path string, flags uint32) *S3File {
 }
 
 type S3File struct {
-    // Mutex on operations
-	Mutex       sync.Mutex
+	// Mutex on operations
+	Mutex sync.Mutex
 
-    // The root of the filesystem
-    root        *S3Root
+	// The root of the filesystem
+	root *S3Root
 
-    // The file descriptor (or -1 of there is none)
-	Fd          int
+	// The file descriptor (or -1 of there is none)
+	Fd int
 
-    // The path of the file
-    Path        string
+	// The path of the file
+	Path string
 
-    // Opening flags in case we have to reopen it
-    Flags       uint32
+	// Opening flags in case we have to reopen it
+	Flags uint32
 }
 
 var _ = (fs.FileHandle)((*S3File)(nil))
@@ -60,10 +60,10 @@ var _ = (fs.FileAllocater)((*S3File)(nil))
 
 func (f *S3File) Read(ctx context.Context, buf []byte, off int64) (res fuse.ReadResult, errno syscall.Errno) {
 
-    // The user asked the real data, we need to download the file or verify the cache
-    if err := f.root.fs.Download(f.Path); err != nil {
-        return nil, fs.ToErrno(err)
-    }
+	// The user asked the real data, we need to download the file or verify the cache
+	if err := f.root.fs.Download(f.Path); err != nil {
+		return nil, fs.ToErrno(err)
+	}
 
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
@@ -73,10 +73,10 @@ func (f *S3File) Read(ctx context.Context, buf []byte, off int64) (res fuse.Read
 
 func (f *S3File) Write(ctx context.Context, data []byte, off int64) (uint32, syscall.Errno) {
 
-    // The user asked the real data, we need to download the file or verify the cache
-    if err := f.root.fs.Download(f.Path); err != nil {
-        return 0, fs.ToErrno(err)
-    }
+	// The user asked the real data, we need to download the file or verify the cache
+	if err := f.root.fs.Download(f.Path); err != nil {
+		return 0, fs.ToErrno(err)
+	}
 
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
@@ -89,9 +89,9 @@ func (f *S3File) Release(ctx context.Context) syscall.Errno {
 	defer f.Mutex.Unlock()
 	if f.Fd != -1 {
 
-        if err := f.root.fs.UnregisterFH(f); err != nil {
-            return fs.ToErrno(err)
-        }
+		if err := f.root.fs.UnregisterFH(f); err != nil {
+			return fs.ToErrno(err)
+		}
 
 		err := syscall.Close(f.Fd)
 		f.Fd = -1
@@ -181,10 +181,10 @@ func (f *S3File) setAttr(ctx context.Context, in *fuse.SetAttrIn) syscall.Errno 
 
 	if sz, ok := in.GetSize(); ok {
 
-        // The user ask to truncate the file, so we need to download the file.
-        if err := f.root.fs.Download(f.Path); err != nil {
-            return fs.ToErrno(err)
-        }
+		// The user ask to truncate the file, so we need to download the file.
+		if err := f.root.fs.Download(f.Path); err != nil {
+			return fs.ToErrno(err)
+		}
 
 		errno = fs.ToErrno(syscall.Ftruncate(f.Fd, int64(sz)))
 		if errno != 0 {
@@ -203,13 +203,13 @@ func (f *S3File) Getattr(ctx context.Context, a *fuse.AttrOut) syscall.Errno {
 		return fs.ToErrno(err)
 	}
 
-    // We have to get the fake size of the file
-    size, err := f.root.fs.GetSize(f.Path)
-    if err != nil {
-        return fs.ToErrno(err)
-    }
+	// We have to get the fake size of the file
+	size, err := f.root.fs.GetSize(f.Path)
+	if err != nil {
+		return fs.ToErrno(err)
+	}
 
-    st.Size = size
+	st.Size = size
 
 	a.FromStat(&st)
 
@@ -217,9 +217,9 @@ func (f *S3File) Getattr(ctx context.Context, a *fuse.AttrOut) syscall.Errno {
 }
 
 func (f *S3File) Lseek(ctx context.Context, off uint64, whence uint32) (uint64, syscall.Errno) {
-    if err := f.root.fs.Download(f.Path); err != nil {
-        return 0, fs.ToErrno(err)
-    }
+	if err := f.root.fs.Download(f.Path); err != nil {
+		return 0, fs.ToErrno(err)
+	}
 
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()

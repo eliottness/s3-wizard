@@ -29,7 +29,7 @@ func DBSanitize(config *ConfigPath) {
 	db := Open(config)
 	db.AutoMigrate(&S3NodeTable{})
 	db.AutoMigrate(&S3Rule{})
-    os.Chmod(config.GetDBPath(), 0600)
+	os.Chmod(config.GetDBPath(), 0600)
 }
 
 /// Open a connection with the database
