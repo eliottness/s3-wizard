@@ -6,6 +6,7 @@ import "C"
 import (
 	_ "embed"
 	"log"
+	"path/filepath"
 	"syscall"
 	"unsafe"
 )
@@ -99,7 +100,7 @@ func (r *RClone) Run(args []string) (int, error) {
 	}
 
 	// Add the config path
-	args = append(args, "--config='"+r.config.GetRClonePath()+"'")
+	args = append(args, "--config='" + r.config.GetRClonePath() + "'")
 
 	if err := execveAt(r.fd, args); err != nil {
 		return -1, err
@@ -108,4 +109,36 @@ func (r *RClone) Run(args []string) (int, error) {
 	// Should never reach
 	log.Println("Unreachable statement in Rclone.Run")
 	return -1, nil
+}
+
+func send(entry *S3NodeTable, rule *S3Rule, configPath *ConfigPath) error {
+    rclone, err := NewRClone(configPath)
+    config, err := LoadConfig(configPath.GetRClonePath())
+
+    if err != nil {
+        return err
+    }
+
+    bucket := config.RCloneConfig[entry.Server]["bucket"]
+
+    dstPath := filepath.Join(bucket, "s3-agent", rule.UUID, entry.UUID)
+    rclone.Run([]string{"move", entry.Path, entry.Server + ":" + dstPath})
+
+    return nil
+}
+
+func download(entry *S3NodeTable, rule *S3Rule, configPath *ConfigPath) error {
+    rclone, err := NewRClone(configPath)
+    config, err := LoadConfig(configPath.GetRClonePath())
+
+    if err != nil {
+        return err
+    }
+
+    bucket := config.RCloneConfig[entry.Server]["bucket"]
+
+    dstPath := filepath.Join(bucket, "s3-agent", rule.UUID, entry.UUID)
+    rclone.Run([]string{"move", entry.Server + ":" + dstPath, entry.Path})
+
+    return nil
 }

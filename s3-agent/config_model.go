@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"os"
 	"time"
-    "golang.org/x/exp/slices"
+
+	"golang.org/x/exp/slices"
 )
 
 const (
