@@ -44,8 +44,14 @@ func Open(config *ConfigPath) *gorm.DB {
 
 /// Returns a file entry from the database
 func GetEntry(db *gorm.DB, path string) *S3NodeTable {
-	var entry S3NodeTable
-	db.Where("Path = ?", path).First(&entry)
+	entry := S3NodeTable{
+		Path:    path,
+		Size:    0,
+		IsLocal: true,
+		UUID:    uuid.New().String(),
+		Server:  "",
+	}
+	db.Where("Path = ?", path).FirstOrCreate(&entry)
 	return &entry
 }
 
@@ -62,7 +68,7 @@ func NewEntry(path string, size int64) *S3NodeTable {
 
 /// Tell the DB that the file is remote now
 func SendToServer(db *gorm.DB, entry *S3NodeTable, server string) {
-	db.Model(entry).Update("Server", server).Update("IsLocal", false)
+	db.Model(entry).Where("Path = ?", entry.Path).Update("Server", server).Update("IsLocal", false)
 }
 
 func IsEntryLocal(db *gorm.DB, path string) bool {
@@ -82,7 +88,7 @@ func RenameEntry(db *gorm.DB, oldPath, newPath string) {
 
 /// Tell the DB that the file is local now
 func RetriveFromServer(db *gorm.DB, entry *S3NodeTable) {
-	db.Model(entry).Update("Server", "").Update("IsLocal", true)
+	db.Model(entry).Where("Path = ?", entry.Path).Update("Server", "").Update("IsLocal", true)
 }
 
 func GetRule(db *gorm.DB, path string) *S3Rule {

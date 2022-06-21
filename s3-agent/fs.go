@@ -4,8 +4,9 @@ import (
     "os"
     "log"
     "sync"
+    "os/signal"
     "syscall"
-    "github.com/hanwen/go-fuse/v2/fs"
+    fuseFs "github.com/hanwen/go-fuse/v2/fs"
     "github.com/hanwen/go-fuse/v2/fuse"
 )
 
@@ -38,14 +39,14 @@ func NewS3FS(loopbackPath, mountPath string, config *ConfigPath) *S3FS {
 
 /// We want to run this function in a goroutine
 /// This function manages 1 Rule for 1 mountpoint
-func (f *S3FS) Run(debug bool) error {
+func (fs *S3FS) Run(debug bool) error {
 
-    loopbackRoot, err := NewS3Root(f.loopbackPath, f)
-    opts := &fs.Options{}
+    loopbackRoot, err := NewS3Root(fs.loopbackPath, fs)
+    opts := &fuseFs.Options{}
 
 	opts.MountOptions.Options = append(opts.MountOptions.Options, "default_permissions")
 	// First column in "df -T": original dir
-	opts.MountOptions.Options = append(opts.MountOptions.Options, "fsname="+f.loopbackPath)
+	opts.MountOptions.Options = append(opts.MountOptions.Options, "fsname="+fs.loopbackPath)
 	// Second column in "df -T" will be shown as "fuse." + Name
 	opts.MountOptions.Name = "s3-agent"
 	// Leave file permissions on "000" files as-is
@@ -55,14 +56,16 @@ func (f *S3FS) Run(debug bool) error {
 	opts.MountOptions.EnableLocks = false
 	opts.MountOptions.Debug = debug
 
-	server, err := fs.Mount(f.mountPath, loopbackRoot, opts)
+	server, err := fuseFs.Mount(fs.mountPath, loopbackRoot, opts)
 	if err != nil {
 		log.Fatalf("Mount fail: %v\n", err)
-        f.logger.Panicln(err)
+        fs.logger.Panicln(err)
 	}
 
-    f.server = server
-	f.server.Wait()
+    fs.catchSignals()
+
+    fs.server = server
+	fs.server.Wait()
 
     return nil
 }
@@ -71,17 +74,19 @@ func (fs *S3FS) Stop() error {
     return fs.server.Unmount()
 }
 
-// We have 4 Hooks on the Fuse calls
+// We have 7 Hooks on the Fuse calls
 // 1. Rename -> Rename entry in the DB
 // 2. Unlink -> Remove entry from the DB + if remote, remove the file from the S3
 // 3. Download -> The user needs the bytes in the file
 // 4. GetSize -> We need the replace the size of the file with the one from the S3
-// 5. Create -> Create a new file in the DB
+// 5. Create -> Create a new file in the DB and register the file handler
 // 6. RegisterFH -> Register the file handle to the list of file handle related to the file
 // 7. UnregisterFH -> Unregister the file handle
 
 /// Rename entry in the DB
 func (fs *S3FS) Rename(oldPath, newPath string) error {
+
+    fs.logger.Printf("Rename: %v -> %v\n", oldPath, newPath)
 
     // If the path does not point to a file, then we don't treat it
     if !fs.regFile(oldPath) {
@@ -102,6 +107,8 @@ func (fs *S3FS) Rename(oldPath, newPath string) error {
 
 /// Remove entry from the DB + if remote, remove the file from the S3
 func (fs *S3FS) Unlink(path string) error {
+
+    fs.logger.Printf("Unlink: %v\n", path)
 
     // If the path does not point to a file, then we don't treat it
     if !fs.regFile(path) {
@@ -130,6 +137,8 @@ func (fs *S3FS) Unlink(path string) error {
 /// We add the entry to the DB and we register the file handle
 func (fs *S3FS) Create(fh *S3File) error {
 
+    fs.logger.Printf("Create: %v\n", fh)
+
     stat, err := os.Stat(fh.Path)
     if err != nil {
         fs.logger.Printf("Error statting file: %v", err)
@@ -154,6 +163,8 @@ func (fs *S3FS) Create(fh *S3File) error {
 /// Replace all file descritor by the new ones
 /// Unlock all file handles
 func (fs *S3FS) Download(path string) error {
+
+    fs.logger.Printf("Download: %v\n", path)
 
     // If the path does not point to a file, then we don't treat it
     if !fs.regFile(path) {
@@ -187,6 +198,9 @@ func (fs *S3FS) Download(path string) error {
 }
 
 func (fs *S3FS) GetSize(path string) (int64, error) {
+
+    fs.logger.Printf("GetSize: %v\n", path)
+
     stat, err := os.Stat(path)
     if err != nil {
         fs.logger.Printf("Error statting file: %v", err)
@@ -212,6 +226,9 @@ func (fs *S3FS) GetSize(path string) (int64, error) {
 
 func (fs *S3FS) RegisterFH(fh *S3File) error {
 
+    fs.logger.Printf("RegisterFH: %v\n", fh)
+
+
     // If the file handle does not point to a file, we do not register it
     if !fs.regFile(fh.Path) {
         return nil
@@ -219,7 +236,6 @@ func (fs *S3FS) RegisterFH(fh *S3File) error {
 
     fs.mutex.Lock()
     defer fs.mutex.Unlock()
-    fs.logger.Println("RegisterFH")
 
     if _, ok := fs.fhmap[fh.Path]; !ok {
         fs.fhmap[fh.Path] = make([]*S3File, 0)
@@ -240,6 +256,8 @@ func (fs *S3FS) RegisterFH(fh *S3File) error {
 }
 
 func (fs *S3FS) UnregisterFH(fh *S3File) error {
+    fs.logger.Printf("UnregisterFH: %v\n", fh)
+
     fs.mutex.Lock()
     defer fs.mutex.Unlock()
 
@@ -305,4 +323,14 @@ func (fs *S3FS) regFile(path string) bool {
     }
 
     return stat.Mode().IsRegular()
+}
+
+func (fs *S3FS) catchSignals() {
+    sigs := make(chan os.Signal, 1)
+    signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+    go func() {
+        sig := <-sigs
+        fs.logger.Printf("Unmounting: %v (Signal: %v)\n", fs.mountPath, sig)
+        fs.Stop()
+    }()
 }
