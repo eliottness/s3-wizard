@@ -11,10 +11,11 @@ import (
 const configFolder = ".s3-agent"
 
 type ConfigPath struct {
-	folder string
+	folder  string
+    debug   bool
 }
 
-func NewConfigPath(userSpecifiedOne *string) *ConfigPath {
+func NewConfigPath(userSpecifiedOne *string, debug bool) *ConfigPath {
 	var configDir string
 	if userSpecifiedOne == nil || *userSpecifiedOne == "" {
 		configDir = getConfigDir()
@@ -27,7 +28,7 @@ func NewConfigPath(userSpecifiedOne *string) *ConfigPath {
 		os.Mkdir(configDir, 0700)
 	}
 
-	return &ConfigPath{configDir}
+	return &ConfigPath{configDir, debug}
 }
 
 func (c *ConfigPath) WriteRCloneConfig(config map[string]map[string]string) error {

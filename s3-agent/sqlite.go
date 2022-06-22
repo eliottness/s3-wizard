@@ -19,7 +19,7 @@ type S3NodeTable struct {
 
 /// Needed to link the local loopback filesystem
 /// with the one we will mount
-type S3Rule struct {
+type S3RuleTable struct {
 	UUID string
 	Path string `gorm:"primaryKey"`
 }
@@ -28,7 +28,7 @@ type S3Rule struct {
 func DBSanitize(config *ConfigPath) {
 	db := Open(config)
 	db.AutoMigrate(&S3NodeTable{})
-	db.AutoMigrate(&S3Rule{})
+	db.AutoMigrate(&S3RuleTable{})
 	os.Chmod(config.GetDBPath(), 0600)
 }
 
@@ -91,14 +91,14 @@ func RetriveFromServer(db *gorm.DB, entry *S3NodeTable) {
 	db.Model(entry).Where("Path = ?", entry.Path).Update("Server", "").Update("IsLocal", true)
 }
 
-func GetRule(db *gorm.DB, path string) *S3Rule {
-	var rule S3Rule
+func GetRule(db *gorm.DB, path string) *S3RuleTable {
+	var rule S3RuleTable
 	db.Where("Path = ?", path).First(&rule)
 	return &rule
 }
 
-func AddIfNotExistsRule(db *gorm.DB, path string) *S3Rule {
-	rule := S3Rule{
+func AddIfNotExistsRule(db *gorm.DB, path string) *S3RuleTable {
+	rule := S3RuleTable{
 		Path: path,
 		UUID: uuid.New().String(),
 	}

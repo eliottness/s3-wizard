@@ -14,7 +14,6 @@ import (
 const version = "0.0.1"
 
 type Context struct {
-	Debug      bool
 	ConfigPath *ConfigPath
 }
 
@@ -109,6 +108,6 @@ func main() {
 		ConfigFolder: "",
 	}
 	ctx := kong.Parse(cli)
-	err := ctx.Run(&Context{Debug: cli.Debug, ConfigPath: NewConfigPath(&cli.ConfigFolder)})
+	err := ctx.Run(&Context{ConfigPath: NewConfigPath(&cli.ConfigFolder, cli.Debug)})
 	ctx.FatalIfErrorf(err)
 }

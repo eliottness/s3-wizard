@@ -4,28 +4,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
+    "golang.org/x/exp/slices"
 )
 
 const (
-	// Basic rule, when the file is updated, send it to the backend
-	// no parameters
-	REPLICATE = "REPLICATE"
-
 	// if the source is older than X
 	// send it to the backend and leave a dummy behind which will download the source upon opening
-	// Parameters example: { value = "3", "unit" = "days" }
+	// Parameters example: "3min" / "1h45min" (See https://pkg.go.dev/time#Duration)
 	OLDER_THAN = "OLDER_THAN"
 
 	// if the source is newer than X
-	// Parameters example: { value = "1", "unit" = "week" }
 	NEWER_THAN = "NEWER_THAN"
 
 	// Send the file when larger than X
-	// Parameters example: { value = "1", "unit" = "Go" }
 	LARGER_THAN = "LARGER_THAN"
 
 	// Send the file when smaller than X
-	// Parameters example: { value = "496", "unit" = "Mo" }
 	SMALLER_THAN = "SMALLER_THAN"
 
 	// User if the file is X
@@ -49,12 +44,12 @@ type Rule struct {
 	Type RuleType `json:"type"`
 
 	// paramaters for the rule
-	Params any `json:"params"`
+	Params string `json:"params"`
 
 	// source path: a folder in the local filesystem
 	// if the source is a file, apply the rule
 	// if the source is a folder, apply the rule on all its files
-	// support shell globbing
+	// support regexp
 	Src string `json:"src"`
 
 	// destination path: must be a valid server name
@@ -68,6 +63,7 @@ type Config struct {
 	RCloneConfig    map[string]map[string]string `json:"rclone-config"`    // Embedded rclone ini config
 }
 
+// Load configuration from path
 func LoadConfig(path string) (*Config, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -87,6 +83,7 @@ func LoadConfig(path string) (*Config, error) {
 	return &config, nil
 }
 
+// Save configuration to path
 func SaveConfig(path string, config *Config) error {
 	file, err := os.Create(path)
 	if err != nil {
@@ -101,12 +98,13 @@ func SaveConfig(path string, config *Config) error {
 	return nil
 }
 
+// Is Config Valid
 func (config *Config) IsValid() error {
 
 	for _, rule := range config.Rules {
-		if err := rule.IsValid(); err != nil {
-			return err
-		}
+        if !slices.Contains(config.Servers, rule.Dest) {
+            return fmt.Errorf("Rule with source '%s': No server named '%s'", rule.Src, rule.Dest)
+        }
 	}
 
 	if len(config.Servers) == 0 {
@@ -124,7 +122,47 @@ func (config *Config) IsValid() error {
 	return nil
 }
 
-func (rule *Rule) IsValid() error {
+func (rule *Rule) MustBeRemote(path string) bool {
 
-	return nil
+    switch rule.Type {
+    case OLDER_THAN:
+        return rule.olderThan(path)
+    case NEWER_THAN:
+        return rule.newerThan(path)
+    default:
+        panic(fmt.Errorf("Rule type '%s' not implemented", rule.Type))
+    }
+
+}
+
+func (rule *Rule) olderThan(path string) bool {
+
+    fo, err := os.Stat(path)
+    if err != nil {
+        return err
+    }
+
+    paramsDuration, err := time.ParseDuration(rule.Params)
+    if err != nil {
+        return err
+    }
+
+    fileModDuration := time.Now().Sub(fo.ModTime())
+    return paramsDuration <= fileModDuration
+}
+
+func (rule *Rule) newerThan(path string) bool {
+
+    fo, err := os.Stat(path)
+    if err != nil {
+        return err
+    }
+
+    paramsDuration, err := time.ParseDuration(rule.Params)
+    if err != nil {
+        return err
+    }
+
+    fileModDuration := time.Now().Sub(fo.ModTime())
+    return paramsDuration >= fileModDuration
 }

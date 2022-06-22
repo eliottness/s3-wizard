@@ -3,6 +3,7 @@ package main
 import (
 	fuseFs "github.com/hanwen/go-fuse/v2/fs"
 	"github.com/hanwen/go-fuse/v2/fuse"
+    "golang.org/x/exp/slices"
 	"log"
 	"os"
 	"os/signal"
@@ -42,6 +43,10 @@ func NewS3FS(loopbackPath, mountPath string, config *ConfigPath) *S3FS {
 func (fs *S3FS) Run(debug bool) error {
 
 	loopbackRoot, err := NewS3Root(fs.loopbackPath, fs)
+    if err != nil {
+        return err
+    }
+
 	opts := &fuseFs.Options{}
 
 	opts.MountOptions.Options = append(opts.MountOptions.Options, "default_permissions")
@@ -182,6 +187,10 @@ func (fs *S3FS) Download(path string) error {
 	fs.lockFHs(path)
 	defer fs.unlockFHs(path)
 
+    if err := syscall.Unlink(path); err != nil {
+        fs.logger.Println("Error removing dummy file", err)
+    }
+
 	// TODO Download the file
 	// Maybe flock the file but not sure if rclone will work as it will be a child process
 
@@ -235,17 +244,15 @@ func (fs *S3FS) RegisterFH(fh *S3File) error {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
 
+    // Check that we don't have already the file handle in the map
+    // If we do, and we don't check this we will lock twice the same mutex
+    // and we will have a deadlock
+    if slices.Index(fs.fhmap[fh.Path], fh) != -1 {
+        return nil
+    }
+
 	if _, ok := fs.fhmap[fh.Path]; !ok {
 		fs.fhmap[fh.Path] = make([]*S3File, 0)
-	}
-
-	// Check that we don't have already the file handle in the map
-	// If we do, and we don't check this we will lock twice the same mutex
-	// and we will have a deadlock
-	for _, otherFh := range fs.fhmap[fh.Path] {
-		if otherFh == fh {
-			return nil
-		}
 	}
 
 	fs.fhmap[fh.Path] = append(fs.fhmap[fh.Path], fh)
@@ -264,14 +271,7 @@ func (fs *S3FS) UnregisterFH(fh *S3File) error {
 		return nil
 	}
 
-	index := -1
-	for i, otherFh := range fs.fhmap[fh.Path] {
-		if otherFh == fh {
-			index = i
-			break
-		}
-	}
-
+	index := slices.Index(fs.fhmap[fh.Path], fh)
 	if index == -1 {
 		fs.logger.Println("WARN: UnregisterFH: file handle not found")
 		return nil
@@ -280,10 +280,47 @@ func (fs *S3FS) UnregisterFH(fh *S3File) error {
 	if len(fs.fhmap[fh.Path]) == 1 {
 		delete(fs.fhmap, fh.Path)
 	} else {
-		ret := make([]*S3File, 0)
-		ret = append(ret, fs.fhmap[fh.Path][:index]...)
-		fs.fhmap[fh.Path] = append(ret, fs.fhmap[fh.Path][index+1:]...)
+        fs.fhmap[fh.Path] = slices.Delete(fs.fhmap[fh.Path], index, index+2)
 	}
+
+	return nil
+}
+
+// Does almost the same as Download
+// But is triggered by the sender goroutine
+// And obviously sends the file to the remote
+func (fs *S3FS) SendRemote(path string)  {
+	fs.logger.Printf("SendRemote: %v\n", path)
+
+	// If the path does not point to a file, then we don't treat it
+	if !fs.regFile(path) {
+		return
+	}
+
+	db := Open(fs.config)
+	entry := GetEntry(db, path)
+
+	// The file does not need to be tracked or the file is local
+	if entry == nil || entry.IsLocal {
+		return
+	}
+
+	// Lock all file handle related to the file
+	fs.lockFHs(path)
+	defer fs.unlockFHs(path)
+
+	// TODO Send the file
+	// Maybe flock the file but not sure if rclone will work as it will be a child process
+
+
+
+	// Replace all file descriptor by the new ones
+	if err := fs.reloadFds(path); err != nil {
+		fs.logger.Printf("Error reloading file descriptors: %v", err)
+		return err
+	}
+
+	SendToServer(db, entry)
 
 	return nil
 }
