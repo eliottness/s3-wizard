@@ -37,7 +37,7 @@ func NewS3FS(loopbackPath, mountPath string, config *ConfigPath) *S3FS {
         loopbackPath: loopbackPath,
         mountPath:    mountPath,
         fhmap:        make(map[string][]*S3File),
-        logger:       log.New(os.Stderr, mountPath+": ", log.LstdFlags),
+        logger:       config.NewLogger("FUSE: " + mountPath),
         config:       config,
         rclone:       rclone,
     }
@@ -125,7 +125,6 @@ func (fs *S3FS) Unlink(path string) error {
 	}
 
 	db := Open(fs.config)
-
     rule := GetRule(db, path)
 
 	var entries []S3NodeTable
