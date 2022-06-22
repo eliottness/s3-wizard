@@ -137,7 +137,7 @@ func (fs *S3FS) Unlink(path string) error {
 	}
 
 	if !entries[0].IsLocal {
-		fs.rclone.remove(&entries[0], rule)
+		fs.rclone.Remove(&entries[0], rule)
 	}
 
 	DeleteEntry(db, &entries[0])
@@ -199,7 +199,7 @@ func (fs *S3FS) Download(path string) error {
         fs.logger.Println("Error removing dummy file", err)
     }
 
-	fs.rclone.download(entry, rule)
+	fs.rclone.Download(entry, rule)
 	// Maybe flock the file but not sure if rclone will work as it will be a child process
 
 	// Replace all file descriptor by the new ones
@@ -317,7 +317,7 @@ func (fs *S3FS) SendRemote(path string, server string) error {
 	fs.lockFHs(path)
 	defer fs.unlockFHs(path)
 
-	fs.rclone.send(entry, rule)
+	fs.rclone.Send(entry, rule)
 	// Maybe flock the file but not sure if rclone will work as it will be a child process
 
 
