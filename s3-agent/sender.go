@@ -1,7 +1,7 @@
 package main
 
 import (
-	"os"
+	"log"
 	"regexp"
 	"strings"
 	"syscall"
@@ -16,6 +16,7 @@ type S3Sender struct {
 	excludePatterns []*regexp.Regexp
     config          *ConfigPath
 	stop            chan bool
+    logger          *log.Logger
 }
 
 func NewS3Sender(rule *Rule, fs *S3FS, excludePattern []string, config *ConfigPath) (*S3Sender, error) {
@@ -26,6 +27,7 @@ func NewS3Sender(rule *Rule, fs *S3FS, excludePattern []string, config *ConfigPa
         excludePatterns: make([]*regexp.Regexp, len(excludePattern)),
         config: config,
         stop: make(chan bool),
+        logger: config.NewLogger("SEND: " + rule.Src),
     }
 
     // Compile regexps
@@ -42,6 +44,7 @@ func NewS3Sender(rule *Rule, fs *S3FS, excludePattern []string, config *ConfigPa
 }
 
 func (s *S3Sender) Run(loopTime time.Duration) {
+    s.logger.Println("Starting SEND Daemon")
 	for {
 		select {
 		case <-s.stop:
@@ -54,6 +57,7 @@ func (s *S3Sender) Run(loopTime time.Duration) {
 }
 
 func (s *S3Sender) Stop() {
+    s.logger.Println("Stopping SEND Daemon")
 	s.stop <- true
 }
 
@@ -61,16 +65,15 @@ func (s *S3Sender) cycle() {
 
     db := Open(s.config)
     for entry := range s.findConcernedFiles(db) {
-
-        if !s.rule.MustBeRemote(entry.Path) {
-            continue
+        if s.rule.MustBeRemote(entry.Path) {
+            s.SendRemote(db, entry)
         }
-
-        s.SendRemote(db, entry)
     }
 }
 
 func (s *S3Sender) SendRemote(db *gorm.DB, entry *S3NodeTable) error {
+
+    s.logger.Printf("Sending file: %v -> %v", entry.Path, s.rule.Dest)
 
 	// The file does not need to be tracked or the file is already remote
 	if entry == nil || !entry.IsLocal {
@@ -85,16 +88,17 @@ func (s *S3Sender) SendRemote(db *gorm.DB, entry *S3NodeTable) error {
 	// Maybe flock the file but not sure if rclone will work as it will be a child process
 
     if err := syscall.Truncate(entry.Path, 0); err != nil {
-        s.fs.logger.Println("Error truncating the file locally", err)
+        s.logger.Println("Error truncating the file locally", err)
     }
 
 	// Replace all file descriptor by the new ones
 	if err := s.fs.reloadFds(entry.Path); err != nil {
-		s.fs.logger.Println("Error reloading file descriptors", err)
+		s.logger.Println("Error reloading file descriptors", err)
 		return err
 	}
 
 	SendToServer(db, entry, s.rule.Dest)
+    return nil
 }
 
 func (s *S3Sender) findConcernedFiles(db *gorm.DB) chan *S3NodeTable {

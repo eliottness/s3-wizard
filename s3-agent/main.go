@@ -51,7 +51,7 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
     }
 
 	fs := NewS3FS(loopback, rule.Src, ctx.ConfigPath)
-	return fs.Run(ctx.Debug)
+	return fs.Run(ctx.ConfigPath.debug)
 }
 
 type ConfigCmd struct {

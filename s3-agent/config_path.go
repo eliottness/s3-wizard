@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -29,6 +30,10 @@ func NewConfigPath(userSpecifiedOne *string, debug bool) *ConfigPath {
 	}
 
 	return &ConfigPath{configDir, debug}
+}
+
+func (c *ConfigPath) NewLogger(prefix string) *log.Logger {
+	return log.New(os.Stderr, prefix, log.Ldate | log.Ltime | log.Lmsgprefix)
 }
 
 func (c *ConfigPath) WriteRCloneConfig(config map[string]map[string]string) error {

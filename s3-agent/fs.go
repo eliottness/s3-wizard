@@ -33,7 +33,7 @@ func NewS3FS(loopbackPath, mountPath string, config *ConfigPath) *S3FS {
 		loopbackPath: loopbackPath,
 		mountPath:    mountPath,
 		fhmap:        make(map[string][]*S3File),
-		logger:       log.New(os.Stderr, mountPath+": ", log.LstdFlags),
+		logger:       config.NewLogger("FUSE: " + mountPath),
 		config:       config,
 	}
 }
@@ -289,12 +289,11 @@ func (fs *S3FS) UnregisterFH(fh *S3File) error {
 // Does almost the same as Download
 // But is triggered by the sender goroutine
 // And obviously sends the file to the remote
-func (fs *S3FS) SendRemote(path string)  {
-	fs.logger.Printf("SendRemote: %v\n", path)
+func (fs *S3FS) SendRemote(path string, server string) error {
 
 	// If the path does not point to a file, then we don't treat it
 	if !fs.regFile(path) {
-		return
+		return nil
 	}
 
 	db := Open(fs.config)
@@ -302,7 +301,7 @@ func (fs *S3FS) SendRemote(path string)  {
 
 	// The file does not need to be tracked or the file is local
 	if entry == nil || entry.IsLocal {
-		return
+		return nil
 	}
 
 	// Lock all file handle related to the file
@@ -313,15 +312,12 @@ func (fs *S3FS) SendRemote(path string)  {
 	// Maybe flock the file but not sure if rclone will work as it will be a child process
 
 
-
 	// Replace all file descriptor by the new ones
 	if err := fs.reloadFds(path); err != nil {
-		fs.logger.Printf("Error reloading file descriptors: %v", err)
 		return err
 	}
 
-	SendToServer(db, entry)
-
+	SendToServer(db, entry, server)
 	return nil
 }
 
