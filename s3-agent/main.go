@@ -37,7 +37,9 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 		return err
 	}
 
-	ctx.ConfigPath.WriteRCloneConfig(config.RCloneConfig)
+	if err = ctx.ConfigPath.WriteRCloneConfig(config.RCloneConfig); err != nil {
+        return err
+    }
 
 	rule := config.Rules[0]
 	db := Open(ctx.ConfigPath)
@@ -45,7 +47,7 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 	loopback := ctx.ConfigPath.GetLoopbackFSPath(dbEntry.UUID)
 
     if !IsDirectory(rule.Src) {
-        if err := os.Mkdir(rule.Src, 755); err != nil {
+        if err := os.Mkdir(rule.Src, 0755); err != nil {
             return err
         }
     }
@@ -70,7 +72,10 @@ func (cmd *ImportConfigCmd) Run(ctx *Context) error {
 		log.Fatalln(err)
 	}
 
-	err = SaveConfig(ctx.ConfigPath.GetAgentConfigPath(), config)
+	if err = SaveConfig(ctx.ConfigPath.GetAgentConfigPath(), config); err != nil {
+        return err
+    }
+
 	return nil
 }
 

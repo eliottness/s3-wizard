@@ -66,19 +66,20 @@ func (s *S3Sender) cycle() {
     db := Open(s.config)
     for entry := range s.findConcernedFiles(db) {
         if s.rule.MustBeRemote(entry.Path) {
-            s.SendRemote(db, entry)
+            if err := s.SendRemote(db, entry); err != nil {
+                s.logger.Printf("Could not send to remote %v\n", s.rule.Dest)
+            }
         }
     }
 }
 
 func (s *S3Sender) SendRemote(db *gorm.DB, entry *S3NodeTable) error {
-
-    s.logger.Printf("Sending file: %v -> %v", entry.Path, s.rule.Dest)
-
 	// The file does not need to be tracked or the file is already remote
 	if entry == nil || !entry.IsLocal {
 		return nil
 	}
+
+    s.logger.Printf("Sending file: %v -> %v", entry.Path, s.rule.Dest)
 
 	// Lock all file handle related to the file
 	s.fs.lockFHs(entry.Path)
@@ -89,6 +90,7 @@ func (s *S3Sender) SendRemote(db *gorm.DB, entry *S3NodeTable) error {
 
     if err := syscall.Truncate(entry.Path, 0); err != nil {
         s.logger.Println("Error truncating the file locally", err)
+        return err
     }
 
 	// Replace all file descriptor by the new ones

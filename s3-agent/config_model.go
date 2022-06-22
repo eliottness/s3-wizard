@@ -95,7 +95,7 @@ func SaveConfig(path string, config *Config) error {
 	if err = json.NewEncoder(file).Encode(config); err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -148,7 +148,7 @@ func (rule *Rule) olderThan(path string) bool {
         return false
     }
 
-    fileModDuration := time.Now().Sub(fo.ModTime())
+    fileModDuration := time.Since(fo.ModTime())
     return paramsDuration <= fileModDuration
 }
 
@@ -164,6 +164,6 @@ func (rule *Rule) newerThan(path string) bool {
         return false
     }
 
-    fileModDuration := time.Now().Sub(fo.ModTime())
+    fileModDuration := time.Since(fo.ModTime())
     return paramsDuration >= fileModDuration
 }
