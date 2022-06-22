@@ -103,10 +103,25 @@ func doSelfUpdate() {
 
 func main() {
 
-	cli := &CLI{
-		Debug:        false,
-		ConfigFolder: "",
-	}
+    //path := "/home/leiyks/Documents/projects/s3-wizard/config.json"
+    //configPath := NewConfigPath(&path, true)
+    //r, _ := NewRClone(configPath)
+
+    //entry := S3NodeTable{
+	//	Path:    path,
+	//	Size:    size,
+	//	IsLocal: true,
+	//	UUID:    uuid.New().String(),
+	//	Server:  "",
+	//}
+    //r.send()
+
+    return
+
+    cli := &CLI{
+        Debug: false,
+        ConfigFolder: "",
+    }
 	ctx := kong.Parse(cli)
 	err := ctx.Run(&Context{ConfigPath: NewConfigPath(&cli.ConfigFolder, cli.Debug)})
 	ctx.FatalIfErrorf(err)

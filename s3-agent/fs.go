@@ -1,14 +1,15 @@
 package main
 
 import (
-	fuseFs "github.com/hanwen/go-fuse/v2/fs"
-	"github.com/hanwen/go-fuse/v2/fuse"
-    "golang.org/x/exp/slices"
 	"log"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
+
+	fuseFs "github.com/hanwen/go-fuse/v2/fs"
+	"github.com/hanwen/go-fuse/v2/fuse"
+	"golang.org/x/exp/slices"
 )
 
 type S3FS struct {
@@ -26,16 +27,20 @@ type S3FS struct {
 	config *ConfigPath
 
 	server *fuse.Server
+    rclone *RClone
 }
 
 func NewS3FS(loopbackPath, mountPath string, config *ConfigPath) *S3FS {
-	return &S3FS{
-		loopbackPath: loopbackPath,
-		mountPath:    mountPath,
-		fhmap:        make(map[string][]*S3File),
-		logger:       config.NewLogger("FUSE: " + mountPath),
-		config:       config,
-	}
+    rclone, _ := NewRClone(config)
+
+    return &S3FS{
+        loopbackPath: loopbackPath,
+        mountPath:    mountPath,
+        fhmap:        make(map[string][]*S3File),
+        logger:       log.New(os.Stderr, mountPath+": ", log.LstdFlags),
+        config:       config,
+        rclone:       rclone,
+    }
 }
 
 /// We want to run this function in a goroutine
