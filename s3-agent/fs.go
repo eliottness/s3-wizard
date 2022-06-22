@@ -1,14 +1,15 @@
 package main
 
 import (
-	fuseFs "github.com/hanwen/go-fuse/v2/fs"
-	"github.com/hanwen/go-fuse/v2/fuse"
-    "golang.org/x/exp/slices"
 	"log"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
+
+	fuseFs "github.com/hanwen/go-fuse/v2/fs"
+	"github.com/hanwen/go-fuse/v2/fuse"
+	"golang.org/x/exp/slices"
 )
 
 type S3FS struct {
@@ -26,16 +27,20 @@ type S3FS struct {
 	config *ConfigPath
 
 	server *fuse.Server
+    rclone *RClone
 }
 
 func NewS3FS(loopbackPath, mountPath string, config *ConfigPath) *S3FS {
-	return &S3FS{
-		loopbackPath: loopbackPath,
-		mountPath:    mountPath,
-		fhmap:        make(map[string][]*S3File),
-		logger:       config.NewLogger("FUSE: " + mountPath),
-		config:       config,
-	}
+    rclone, _ := NewRClone(config)
+
+    return &S3FS{
+        loopbackPath: loopbackPath,
+        mountPath:    mountPath,
+        fhmap:        make(map[string][]*S3File),
+        logger:       config.NewLogger("FUSE: " + mountPath),
+        config:       config,
+        rclone:       rclone,
+    }
 }
 
 /// We want to run this function in a goroutine
@@ -120,6 +125,7 @@ func (fs *S3FS) Unlink(path string) error {
 	}
 
 	db := Open(fs.config)
+    rule := GetRule(db, path)
 
 	var entries []S3NodeTable
 	db.Where("Path = ?", path).Limit(1).Find(&entries)
@@ -130,7 +136,7 @@ func (fs *S3FS) Unlink(path string) error {
 	}
 
 	if !entries[0].IsLocal {
-		// TODO Remove file from S3
+		fs.rclone.Remove(&entries[0], rule)
 	}
 
 	DeleteEntry(db, &entries[0])
@@ -177,6 +183,7 @@ func (fs *S3FS) Download(path string) error {
 
 	db := Open(fs.config)
 	entry := GetEntry(db, path)
+	rule := GetRule(db, path)
 
 	// The file does not need to be tracked or the file is local
 	if entry == nil || entry.IsLocal {
@@ -191,7 +198,7 @@ func (fs *S3FS) Download(path string) error {
         fs.logger.Println("Error removing dummy file", err)
     }
 
-	// TODO Download the file
+	fs.rclone.Download(entry, rule)
 	// Maybe flock the file but not sure if rclone will work as it will be a child process
 
 	// Replace all file descriptor by the new ones
@@ -298,6 +305,7 @@ func (fs *S3FS) SendRemote(path string, server string) error {
 
 	db := Open(fs.config)
 	entry := GetEntry(db, path)
+	rule := GetRule(db, path)
 
 	// The file does not need to be tracked or the file is local
 	if entry == nil || entry.IsLocal {
@@ -308,7 +316,7 @@ func (fs *S3FS) SendRemote(path string, server string) error {
 	fs.lockFHs(path)
 	defer fs.unlockFHs(path)
 
-	// TODO Send the file
+	fs.rclone.Send(entry, rule)
 	// Maybe flock the file but not sure if rclone will work as it will be a child process
 
 
