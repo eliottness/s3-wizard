@@ -5,7 +5,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package s3fuse
+package main
 
 import (
 	"context"
@@ -68,8 +68,9 @@ func (n *S3Node) renameExchange(name string, newparent fs.InodeEmbedder, newName
 		return syscall.EBUSY
 	}
 
-    // TODO
-    // swap names in the db
+	if err := n.RootData.fs.Rename(filepath.Join(n.path(), name), filepath.Join(p2, newName)); err != nil {
+		return fs.ToErrno(err)
+	}
 
 	return fs.ToErrno(unix.Renameat2(fd1, name, fd2, newName, unix.RENAME_EXCHANGE))
 }
@@ -77,10 +78,6 @@ func (n *S3Node) renameExchange(name string, newparent fs.InodeEmbedder, newName
 func (n *S3Node) CopyFileRange(ctx context.Context, fhIn fs.FileHandle,
 	offIn uint64, out *fs.Inode, fhOut fs.FileHandle, offOut uint64,
 	len uint64, flags uint64) (uint32, syscall.Errno) {
-
-    // TODO
-    // if isremote && isfile, download the file and update the db about the file location + delete on the S3
-    // x2
 
 	lfIn, ok := fhIn.(*S3File)
 	if !ok {
@@ -91,8 +88,16 @@ func (n *S3Node) CopyFileRange(ctx context.Context, fhIn fs.FileHandle,
 		return 0, syscall.ENOTSUP
 	}
 
+	if err := n.RootData.fs.Download(lfIn.Path); err != nil {
+		return 0, fs.ToErrno(err)
+	}
+
+	if err := n.RootData.fs.Download(lfOut.Path); err != nil {
+		return 0, fs.ToErrno(err)
+	}
+
 	signedOffIn := int64(offIn)
 	signedOffOut := int64(offOut)
-	count, err := unix.CopyFileRange(lfIn.fd, &signedOffIn, lfOut.fd, &signedOffOut, int(len), int(flags))
+	count, err := unix.CopyFileRange(lfIn.Fd, &signedOffIn, lfOut.Fd, &signedOffOut, int(len), int(flags))
 	return uint32(count), fs.ToErrno(err)
 }

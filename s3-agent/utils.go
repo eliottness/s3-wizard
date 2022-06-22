@@ -1,8 +1,9 @@
-package s3fuse
+package main
 
 import (
 	"syscall"
 	"unsafe"
+    "os"
 )
 
 // futimens - futimens(3) calls utimensat(2) with "pathname" set to null and
@@ -13,4 +14,9 @@ func futimens(fd int, times *[2]syscall.Timespec) (err error) {
 		err = syscall.Errno(e1)
 	}
 	return
+}
+
+func IsDirectory(path string) bool {
+    fo, err := os.Stat(path);
+    return err != nil || !fo.IsDir()
 }

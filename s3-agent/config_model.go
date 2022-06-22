@@ -1,65 +1,169 @@
 package main
 
-import "net/url"
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"time"
+
+	"golang.org/x/exp/slices"
+)
 
 const (
-    // Basic rule, when the file is updated, send it to the backend
-    // no parameters
-    REPLICATE = "REPLICATE"
+	// if the source is older than X
+	// send it to the backend and leave a dummy behind which will download the source upon opening
+	// Parameters example: "3min" / "1h45min" (See https://pkg.go.dev/time#Duration)
+	OLDER_THAN = "OLDER_THAN"
 
-    // if the source is older than X
-    // send it to the backend and leave a dummy behind which will download the source upon opening
-    // Parameters example: { value = "3", "unit" = "days" }
-    OLDER_THAN = "OLDER_THAN"
+	// if the source is newer than X
+	NEWER_THAN = "NEWER_THAN"
 
-    // if the source is newer than X
-    // Parameters example: { value = "1", "unit" = "week" }
-    NEWER_THAN = "NEWER_THAN"
+	// Send the file when larger than X
+	LARGER_THAN = "LARGER_THAN"
 
-    // Send the file when larger than X
-    // Parameters example: { value = "1", "unit" = "Go" }
-    LARGER_THAN = "LARGER_THAN"
+	// Send the file when smaller than X
+	SMALLER_THAN = "SMALLER_THAN"
 
-    // Send the file when smaller than X
-    // Parameters example: { value = "496", "unit" = "Mo" }
-    SMALLER_THAN = "SMALLER_THAN"
-
-    // User if the file is X
-    // Parameters example: "john"
-    USER_IS = "USER_IS"
+	// User if the file is X
+	// Parameters example: "john"
+	USER_IS = "USER_IS"
 )
 
 type RuleType string
 
 type ValueTypeParamater struct {
-    // must be positive
-    value   int
-    // can be:
-    // * years, months, weeks, days, hours, minutes, seconds    -> time rules
-    // * To, Go, Mo, Ko                                         -> size rules
-    unit    string
+	// must be positive
+	Value int `json:"value"`
+	// can be:
+	// * years, months, weeks, days, hours, minutes, seconds    -> time rules
+	// * To, Go, Mo, Ko                                         -> size rules
+	Unit string `json:"unit"`
 }
 
 type Rule struct {
-    // type of rule, must be in the elements above
-    Type    RuleType        `json:"type"`
+	// type of rule, must be in the elements above
+	Type RuleType `json:"type"`
 
-    // paramaters for the rule
-    Params interface{}      `json:"params"`
+	// paramaters for the rule
+	Params string `json:"params"`
 
-    // source path: can be a file or a folder in the local filesystem
-    // if the source is a file, apply the rule
-    // if the source is a folder, apply the rule on all its files
-    // support shell globbing
-    Src     string          `json:"src"`
+	// source path: a folder in the local filesystem
+	// if the source is a file, apply the rule
+	// if the source is a folder, apply the rule on all its files
+	// support regexp
+	Src string `json:"src"`
 
-    // destination path: must be a valid server name
-    Dest    string          `json:"dest"`
+	// destination path: must be a valid server name
+	Dest string `json:"dest"`
 }
 
 type Config struct {
-    Servers map[string]string                   `json:"servers"`            // servers to connect to
-    Rules   []Rule                              `json:"rules"`              // rules to apply
-    ExcludePatterns []string                    `json:"exclude_patterns"`   // exclude files matching this paterns
-    RCloneConfig map[string]map[string]string   `json:"rclone_config"`      // Embedded rclone ini config
+	Servers         []string                     `json:"servers"`          // servers to connect to
+	Rules           []Rule                       `json:"rules"`            // rules to apply
+	ExcludePatterns []string                     `json:"exclude-patterns"` // exclude files matching this paterns
+	RCloneConfig    map[string]map[string]string `json:"rclone-config"`    // Embedded rclone ini config
+}
+
+// Load configuration from path
+func LoadConfig(path string) (*Config, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var config Config
+	err = json.NewDecoder(file).Decode(&config)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := config.IsValid(); err != nil {
+		return nil, err
+	}
+
+	return &config, nil
+}
+
+// Save configuration to path
+func SaveConfig(path string, config *Config) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	if err = json.NewEncoder(file).Encode(config); err != nil {
+		return err
+	}
+	
+	return nil
+}
+
+// Is Config Valid
+func (config *Config) IsValid() error {
+
+	for _, rule := range config.Rules {
+        if !slices.Contains(config.Servers, rule.Dest) {
+            return fmt.Errorf("Rule with source '%s': No server named '%s'", rule.Src, rule.Dest)
+        }
+	}
+
+	if len(config.Servers) == 0 {
+		return fmt.Errorf("No server specified")
+	}
+
+	if len(config.Rules) == 0 {
+		return fmt.Errorf("No rule specified")
+	}
+
+	if len(config.Rules) > 1 {
+		return fmt.Errorf("Only one rule is supported in this version, please upgrade by restarting the agent")
+	}
+
+	return nil
+}
+
+func (rule *Rule) MustBeRemote(path string) bool {
+
+    switch rule.Type {
+    case OLDER_THAN:
+        return rule.olderThan(path)
+    case NEWER_THAN:
+        return rule.newerThan(path)
+    default:
+        panic(fmt.Errorf("Rule type '%s' not implemented", rule.Type))
+    }
+
+}
+
+func (rule *Rule) olderThan(path string) bool {
+
+    fo, err := os.Stat(path)
+    if err != nil {
+        return false
+    }
+
+    paramsDuration, err := time.ParseDuration(rule.Params)
+    if err != nil {
+        return false
+    }
+
+    fileModDuration := time.Now().Sub(fo.ModTime())
+    return paramsDuration <= fileModDuration
+}
+
+func (rule *Rule) newerThan(path string) bool {
+
+    fo, err := os.Stat(path)
+    if err != nil {
+        return false
+    }
+
+    paramsDuration, err := time.ParseDuration(rule.Params)
+    if err != nil {
+        return false
+    }
+
+    fileModDuration := time.Now().Sub(fo.ModTime())
+    return paramsDuration >= fileModDuration
 }
