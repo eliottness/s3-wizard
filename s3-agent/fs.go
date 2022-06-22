@@ -126,6 +126,8 @@ func (fs *S3FS) Unlink(path string) error {
 
 	db := Open(fs.config)
 
+    rule := GetRule(db, path)
+
 	var entries []S3NodeTable
 	db.Where("Path = ?", path).Limit(1).Find(&entries)
 
@@ -135,7 +137,7 @@ func (fs *S3FS) Unlink(path string) error {
 	}
 
 	if !entries[0].IsLocal {
-		// TODO Remove file from S3
+		fs.rclone.remove(&entries[0], rule)
 	}
 
 	DeleteEntry(db, &entries[0])
@@ -182,6 +184,7 @@ func (fs *S3FS) Download(path string) error {
 
 	db := Open(fs.config)
 	entry := GetEntry(db, path)
+	rule := GetRule(db, path)
 
 	// The file does not need to be tracked or the file is local
 	if entry == nil || entry.IsLocal {
@@ -196,7 +199,7 @@ func (fs *S3FS) Download(path string) error {
         fs.logger.Println("Error removing dummy file", err)
     }
 
-	// TODO Download the file
+	fs.rclone.download(entry, rule)
 	// Maybe flock the file but not sure if rclone will work as it will be a child process
 
 	// Replace all file descriptor by the new ones
@@ -303,6 +306,7 @@ func (fs *S3FS) SendRemote(path string, server string) error {
 
 	db := Open(fs.config)
 	entry := GetEntry(db, path)
+	rule := GetRule(db, path)
 
 	// The file does not need to be tracked or the file is local
 	if entry == nil || entry.IsLocal {
@@ -313,7 +317,7 @@ func (fs *S3FS) SendRemote(path string, server string) error {
 	fs.lockFHs(path)
 	defer fs.unlockFHs(path)
 
-	// TODO Send the file
+	fs.rclone.send(entry, rule)
 	// Maybe flock the file but not sure if rclone will work as it will be a child process
 
 
