@@ -29,10 +29,10 @@ jobs:
       run: cd s3-agent && go vet
 
     - name: Install golint
-      run: go install golang.org/x/lint/golint@latest
+      run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.46.2
 
     - name: Run golint
-      run: cd s3-agent && golint
+      run: cd s3-agent && golangci-lint run --fast
 
     - name: Run tests
       run: cd s3-agent && go test -race -vet=off
