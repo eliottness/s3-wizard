@@ -37,7 +37,7 @@ func NewS3FS(loopbackPath, mountPath string, config *ConfigPath) *S3FS {
         loopbackPath: loopbackPath,
         mountPath:    mountPath,
         fhmap:        make(map[string][]*S3File),
-        logger:       config.NewLogger("FUSE: " + mountPath),
+        logger:       config.NewLogger("FUSE: " + mountPath + " | "),
         config:       config,
         rclone:       rclone,
     }
@@ -46,6 +46,11 @@ func NewS3FS(loopbackPath, mountPath string, config *ConfigPath) *S3FS {
 /// We want to run this function in a goroutine
 /// This function manages 1 Rule for 1 mountpoint
 func (fs *S3FS) Run(debug bool) error {
+
+	if err := os.Mkdir(fs.mountPath, 755); err != nil {
+		log.Printf("Cannot create filesystem root node: %v must be an empty path", fs.mountPath)
+		return err
+	}
 
 	loopbackRoot, err := NewS3Root(fs.loopbackPath, fs)
     if err != nil {
@@ -81,7 +86,16 @@ func (fs *S3FS) Run(debug bool) error {
 }
 
 func (fs *S3FS) Stop() error {
-	return fs.server.Unmount()
+	err := fs.server.Unmount()
+	if err != nil {
+		fs.logger.Printf("Error unmounting '%v': %v", fs.mountPath, err)
+	}
+
+	if err := os.Remove(fs.mountPath); err != nil {
+		fs.logger.Printf("Error removing root filesystem node '%v': %v", fs.mountPath, err)
+	}
+
+	return err
 }
 
 // We have 7 Hooks on the Fuse calls
@@ -99,7 +113,7 @@ func (fs *S3FS) Rename(oldPath, newPath string) error {
 	fs.logger.Printf("Rename: %v -> %v\n", oldPath, newPath)
 
 	// If the path does not point to a file, then we don't treat it
-	if !fs.regFile(oldPath) {
+	if !IsRegFile(oldPath) {
 		return nil
 	}
 
@@ -120,7 +134,7 @@ func (fs *S3FS) Unlink(path string) error {
 	fs.logger.Printf("Unlink: %v\n", path)
 
 	// If the path does not point to a file, then we don't treat it
-	if !fs.regFile(path) {
+	if !IsRegFile(path) {
 		return nil
 	}
 
@@ -177,7 +191,7 @@ func (fs *S3FS) Download(path string) error {
 	fs.logger.Printf("Download: %v\n", path)
 
 	// If the path does not point to a file, then we don't treat it
-	if !fs.regFile(path) {
+	if !IsRegFile(path) {
 		return nil
 	}
 
@@ -244,7 +258,7 @@ func (fs *S3FS) RegisterFH(fh *S3File) error {
 	fs.logger.Printf("RegisterFH: %v\n", fh)
 
 	// If the file handle does not point to a file, we do not register it
-	if !fs.regFile(fh.Path) {
+	if !IsRegFile(fh.Path) {
 		return nil
 	}
 
@@ -320,16 +334,6 @@ func (fs *S3FS) reloadFds(path string) error {
 	}
 
 	return nil
-}
-
-func (fs *S3FS) regFile(path string) bool {
-	stat, err := os.Stat(path)
-	if err != nil {
-		fs.logger.Printf("Error statting file: %v", err)
-		return false
-	}
-
-	return stat.Mode().IsRegular()
 }
 
 func (fs *S3FS) catchSignals() {

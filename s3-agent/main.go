@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"syscall"
 
-	"github.com/robfig/cron"
 	"github.com/alecthomas/kong"
 	"github.com/blang/semver"
 	"github.com/rhysd/go-github-selfupdate/selfupdate"
+	"github.com/robfig/cron"
 )
 
 const version = "0.0.1"
@@ -35,6 +36,7 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 
 	config, err := LoadConfig(ctx.ConfigPath.GetAgentConfigPath())
 	if err != nil {
+		log.Println("Cannot load config", err)
 		return err
 	}
 
@@ -45,15 +47,21 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 	dbEntry := AddIfNotExistsRule(db, rule.Src)
 	loopback := ctx.ConfigPath.GetLoopbackFSPath(dbEntry.UUID)
 
-    if !IsDirectory(rule.Src) {
-        if err := os.Mkdir(rule.Src, 755); err != nil {
-            return err
-        }
-    }
+	if _, err := os.Stat(rule.Src); os.IsExist(err) {
+
+		if err := importFS(rule); err != nil {
+			return err
+		}
+
+		if _, err := os.Stat(rule.Src); os.IsExist(err) {
+			log.Println("Cannot mount destination: file exists: ", rule.Src)
+		}
+	}
 
 	fs := NewS3FS(loopback, rule.Src, ctx.ConfigPath)
 	sender, err := NewS3Sender(&rule, fs, config.ExcludePatterns, ctx.ConfigPath)
 	if err != nil {
+		log.Println("Failed to create Cron sender", err)
 		return err
 	}
 
@@ -61,7 +69,13 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 	cron.AddFunc(rule.CronSender, sender.Cycle)
 	cron.Start()
 
-	return fs.Run(ctx.ConfigPath.debug)
+	go fs.Run(ctx.ConfigPath.debug)
+	sender.Cycle()
+	// if err != nil {
+	// 	log.Printf("Cannot mount filesystem at pas %v", err )
+	// }
+
+	return err
 }
 
 type ConfigCmd struct {
@@ -78,6 +92,12 @@ func (cmd *ImportConfigCmd) Run(ctx *Context) error {
 	config, err := LoadConfig(cmd.ConfigPath)
 	if err != nil {
 		log.Fatalln(err)
+	}
+
+	for _, rule := range config.Rules {
+		if _, err := os.Stat(rule.Src); os.IsExist(err) {
+			importFS(rule, ctx.ConfigPath)
+		}
 	}
 
 	return SaveConfig(ctx.ConfigPath.GetAgentConfigPath(), config)
