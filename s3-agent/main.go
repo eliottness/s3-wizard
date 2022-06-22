@@ -39,7 +39,9 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 		return err
 	}
 
-	ctx.ConfigPath.WriteRCloneConfig(config.RCloneConfig)
+	if err = ctx.ConfigPath.WriteRCloneConfig(config.RCloneConfig); err != nil {
+        return err
+    }
 
 	rule := config.Rules[0]
 	db := Open(ctx.ConfigPath)
@@ -67,7 +69,7 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 	cron := cron.New()
 	cron.AddFunc(rule.CronSender, sender.Cycle)
 	cron.Start()
-	
+
 	if err := fs.Run(ctx.ConfigPath.debug); err != nil {
 		log.Printf("Cannot mount filesystem at pas %v", err )
 	}

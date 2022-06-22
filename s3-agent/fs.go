@@ -150,7 +150,10 @@ func (fs *S3FS) Unlink(path string) error {
 	}
 
 	if !entries[0].IsLocal {
-		fs.rclone.Remove(&entries[0], rule)
+		if err := fs.rclone.Remove(&entries[0], rule); err != nil {
+            fs.logger.Printf("Error removing the local file: %v", err)
+            return nil
+        }
 	}
 
 	DeleteEntry(db, &entries[0])
@@ -212,7 +215,9 @@ func (fs *S3FS) Download(path string) error {
 		fs.logger.Println("Error removing dummy file", err)
 	}
 
-	fs.rclone.Download(entry, rule)
+	if err := fs.rclone.Download(entry, rule); err != nil {
+        fs.logger.Println("Error while downloading the file", err)
+    }
 	// Maybe flock the file but not sure if rclone will work as it will be a child process
 
 	// Replace all file descriptor by the new ones
@@ -342,6 +347,8 @@ func (fs *S3FS) catchSignals() {
 	go func() {
 		sig := <-sigs
 		fs.logger.Printf("Unmounting: %v (Signal: %v)\n", fs.mountPath, sig)
-		fs.Stop()
+		if err := fs.Stop(); err != nil {
+            fs.logger.Printf("Error while unmounting: %v\n", fs.mountPath)
+        }
 	}()
 }

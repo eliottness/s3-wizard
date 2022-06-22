@@ -26,7 +26,9 @@ func NewConfigPath(userSpecifiedOne *string, debug bool) *ConfigPath {
 
 	if _, err := os.Stat(configDir); os.IsNotExist(err) {
 		// We don't want anyone to read our config since it will contains credentials
-		os.Mkdir(configDir, 0700)
+		if err = os.Mkdir(configDir, 0700); err != nil {
+            return nil
+        }
 	}
 
 	return &ConfigPath{configDir, debug}
@@ -86,9 +88,9 @@ func (c *ConfigPath) GetLoopbackFSPath(uuid string) string {
 
 func getConfigDir() string {
 
-	var home string
+	home := ""
 	if runtime.GOOS == "windows" {
-		home := os.Getenv("HOMEDRIVE") + os.Getenv("HOMEPATH")
+		home = os.Getenv("HOMEDRIVE") + os.Getenv("HOMEPATH")
 		if home == "" {
 			home = os.Getenv("USERPROFILE")
 		}
