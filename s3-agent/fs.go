@@ -293,42 +293,6 @@ func (fs *S3FS) UnregisterFH(fh *S3File) error {
 	return nil
 }
 
-// Does almost the same as Download
-// But is triggered by the sender goroutine
-// And obviously sends the file to the remote
-func (fs *S3FS) SendRemote(path string, server string) error {
-
-	// If the path does not point to a file, then we don't treat it
-	if !fs.regFile(path) {
-		return nil
-	}
-
-	db := Open(fs.config)
-	entry := GetEntry(db, path)
-	rule := GetRule(db, path)
-
-	// The file does not need to be tracked or the file is local
-	if entry == nil || entry.IsLocal {
-		return nil
-	}
-
-	// Lock all file handle related to the file
-	fs.lockFHs(path)
-	defer fs.unlockFHs(path)
-
-	fs.rclone.Send(entry, rule)
-	// Maybe flock the file but not sure if rclone will work as it will be a child process
-
-
-	// Replace all file descriptor by the new ones
-	if err := fs.reloadFds(path); err != nil {
-		return err
-	}
-
-	SendToServer(db, entry, server)
-	return nil
-}
-
 func (fs *S3FS) lockFHs(path string) {
 	for _, fh := range fs.fhmap[path] {
 		fh.Mutex.Lock()

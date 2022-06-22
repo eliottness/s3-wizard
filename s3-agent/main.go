@@ -6,6 +6,7 @@ import (
 	"os"
 	"syscall"
 
+	"github.com/robfig/cron"
 	"github.com/alecthomas/kong"
 	"github.com/blang/semver"
 	"github.com/rhysd/go-github-selfupdate/selfupdate"
@@ -51,6 +52,15 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
     }
 
 	fs := NewS3FS(loopback, rule.Src, ctx.ConfigPath)
+	sender, err := NewS3Sender(&rule, fs, config.ExcludePatterns, ctx.ConfigPath)
+	if err != nil {
+		return err
+	}
+
+	cron := cron.New()
+	cron.AddFunc(rule.CronSender, sender.Cycle)
+	cron.Start()
+
 	return fs.Run(ctx.ConfigPath.debug)
 }
 
@@ -70,8 +80,7 @@ func (cmd *ImportConfigCmd) Run(ctx *Context) error {
 		log.Fatalln(err)
 	}
 
-	err = SaveConfig(ctx.ConfigPath.GetAgentConfigPath(), config)
-	return nil
+	return SaveConfig(ctx.ConfigPath.GetAgentConfigPath(), config)
 }
 
 type CLI struct {

@@ -43,25 +43,9 @@ func NewS3Sender(rule *Rule, fs *S3FS, excludePattern []string, config *ConfigPa
     return s, nil
 }
 
-func (s *S3Sender) Run(loopTime time.Duration) {
-    s.logger.Println("Starting SEND Daemon")
-	for {
-		select {
-		case <-s.stop:
-			return
-		default:
-			s.cycle()
-			time.Sleep(loopTime)
-		}
-	}
-}
+func (s *S3Sender) Cycle() {
 
-func (s *S3Sender) Stop() {
-    s.logger.Println("Stopping SEND Daemon")
-	s.stop <- true
-}
-
-func (s *S3Sender) cycle() {
+    s.logger.Println("Running SEND Cycle")
 
     db := Open(s.config)
     for entry := range s.findConcernedFiles(db) {
@@ -84,8 +68,8 @@ func (s *S3Sender) SendRemote(db *gorm.DB, entry *S3NodeTable) error {
 	s.fs.lockFHs(entry.Path)
 	defer s.fs.unlockFHs(entry.Path)
 
-	// TODO Send the file
-	// Maybe flock the file but not sure if rclone will work as it will be a child process
+    rule := GetRule(db, s.rule.Src)
+    s.fs.rclone.Send(entry, rule)
 
     if err := syscall.Truncate(entry.Path, 0); err != nil {
         s.logger.Println("Error truncating the file locally", err)

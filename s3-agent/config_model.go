@@ -55,6 +55,10 @@ type Rule struct {
 
 	// destination path: must be a valid server name
 	Dest string `json:"dest"`
+
+	// Cron to send the values 
+	// See Cron format: https://pkg.go.dev/github.com/robfig/cron
+	CronSender string `json:"cron-sender`
 }
 
 type Config struct {
