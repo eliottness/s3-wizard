@@ -17,5 +17,8 @@ build: rclone
 run: rclone
 	go run .
 
+test: build
+	pytest ../tests
+
 clean:
 	rm -f s3-agent rclone
