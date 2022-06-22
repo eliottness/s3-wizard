@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/alecthomas/kong"
@@ -17,14 +19,7 @@ type Context struct {
 	ConfigPath *ConfigPath
 }
 
-type SendCmd struct {
-	ConfigPath     string `arg:"" name:"configPath" help:"Path to the agent config file." type:"path"`
-	SyncFolderPath string `arg:"" name:"syncFolderPath" help:"Path to the folder to sync." type:"path"`
-}
-
-type SyncCmd struct {
-	LoopbackPath string `help:"Path to underlying filesystem." type:"path"`
-}
+type SyncCmd struct {}
 
 func (cmd *SyncCmd) Run(ctx *Context) error {
 
@@ -56,6 +51,64 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 	return fs.Run(ctx.ConfigPath.debug)
 }
 
+type TestRuleCmd struct {
+	Rule string `arg:"" help:"Name of the rule to test."`
+	Path string `arg:"" help:"Path of the file to test." type:"path"`
+}
+
+func (cmd *TestRuleCmd) Run(ctx *Context) error {
+    // Load config
+    config, err := LoadConfig(ctx.ConfigPath.GetAgentConfigPath())
+	if err != nil {
+		return err
+	}
+
+    file, err := os.Stat(cmd.Path)
+    if err != nil {
+        return err
+    }
+
+    for _, rule := range config.Rules {
+        if string(rule.Type) == cmd.Rule {
+            // Get absolute path of the filesystem root handled by the rule
+            ruleSrc, err := filepath.Abs(rule.Src)
+            if err != nil {
+                return err
+            }
+
+            // The given file path is not in the rule filesystem
+            if relativePath, err := filepath.Rel(ruleSrc, cmd.Path); err != nil || strings.HasPrefix(relativePath, "..") {
+                log.Fatal("File is not part of the rule file system")
+            }
+
+            printResults := func(path string) {
+                if rule.MustBeRemote(path) {
+                    fmt.Printf("'%s' must be send to remote.\n", path)
+                } else {
+                    fmt.Printf("'%s' must not be send to remote.\n", path)
+                }
+            }
+
+            if !file.IsDir() {
+                printResults(cmd.Path)
+            } else {
+                filepath.Walk(cmd.Path, func(path string, info os.FileInfo, err error) error {
+                    if err != nil {
+                        return err
+                    }
+                    if !info.IsDir() { printResults(path) }
+                    return nil
+                })
+            }
+
+            return nil
+        }
+    }
+
+    log.Fatal("Given rule does not exist.")
+    return nil
+}
+
 type ConfigCmd struct {
 	Import ImportConfigCmd `cmd:"" name:"import" help:"Import the config."`
 }
@@ -72,18 +125,16 @@ func (cmd *ImportConfigCmd) Run(ctx *Context) error {
 		log.Fatalln(err)
 	}
 
-	if err = SaveConfig(ctx.ConfigPath.GetAgentConfigPath(), config); err != nil {
-        return err
-    }
-
-	return nil
+	err = SaveConfig(ctx.ConfigPath.GetAgentConfigPath(), config)
+	return err
 }
 
 type CLI struct {
-	Debug        bool      `help:"Enable debug mode."`
-	ConfigFolder string    `help:"Path to the agent config folder."`
-	Sync         SyncCmd   `cmd:"" name:"sync" help:"Run the sync daemon."`
-	Config       ConfigCmd `cmd:"" name:"config" help:"Manage the config."`
+	Debug        bool        `help:"Enable debug mode."`
+	ConfigFolder string      `help:"Path to the agent config folder."`
+	Sync         SyncCmd     `cmd:"" name:"sync" help:"Run the sync daemon."`
+	TestRule     TestRuleCmd `cmd:"" name:"test-rule" help:"Test a rule on a file."`
+	Config       ConfigCmd   `cmd:"" name:"config" help:"Manage the config."`
 }
 
 func doSelfUpdate() {
