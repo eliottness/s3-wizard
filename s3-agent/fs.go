@@ -321,7 +321,9 @@ func (fs *S3FS) SendRemote(path string, server string) error {
 	fs.lockFHs(path)
 	defer fs.unlockFHs(path)
 
-	fs.rclone.Send(entry, rule)
+    if err := fs.rclone.Send(entry, rule); err != nil {
+        fs.logger.Printf("Could not send the file %v to the remote %v", path, server)
+    }
 	// Maybe flock the file but not sure if rclone will work as it will be a child process
 
 

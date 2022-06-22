@@ -1,0 +1,18 @@
+linters:
+  # Disable all linters.
+  # Default: false
+  disable-all: true
+  # Enable specific linter
+  # https://golangci-lint.run/usage/linters/#enabled-by-default-linters
+  enable:
+    - typecheck
+    - gosimple
+    - govet
+    - errcheck
+    - ineffassign
+    - errorlint
+    - exportloopref
+    - gocognit
+    - goconst
+    - gocritic
+    - goerr113
