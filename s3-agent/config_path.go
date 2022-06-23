@@ -12,8 +12,8 @@ import (
 const configFolder = ".s3-agent"
 
 type ConfigPath struct {
-	folder  string
-    debug   bool
+	folder string
+	debug  bool
 }
 
 func NewConfigPath(userSpecifiedOne *string, debug bool) *ConfigPath {
@@ -35,7 +35,7 @@ func NewConfigPath(userSpecifiedOne *string, debug bool) *ConfigPath {
 }
 
 func (c *ConfigPath) NewLogger(prefix string) *log.Logger {
-	return log.New(os.Stderr, prefix, log.Ldate | log.Ltime | log.Lmsgprefix)
+	return log.New(os.Stderr, prefix, log.Ldate|log.Ltime|log.Lmsgprefix)
 }
 
 func (c *ConfigPath) WriteRCloneConfig(config map[string]map[string]string) error {
@@ -47,10 +47,10 @@ func (c *ConfigPath) WriteRCloneConfig(config map[string]map[string]string) erro
 		}
 	}
 	if err := cfg.SaveTo(c.GetRClonePath()); err != nil {
-        return err
-    }
+		return err
+	}
 
-    return os.Chmod(c.GetRClonePath(), 0600)
+	return os.Chmod(c.GetRClonePath(), 600)
 }
 
 func (c *ConfigPath) GetRClonePath() string {

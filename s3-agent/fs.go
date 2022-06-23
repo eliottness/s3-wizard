@@ -27,30 +27,35 @@ type S3FS struct {
 	config *ConfigPath
 
 	server *fuse.Server
-    rclone *RClone
+	rclone *RClone
 }
 
 func NewS3FS(loopbackPath, mountPath string, config *ConfigPath) *S3FS {
-    rclone, _ := NewRClone(config)
+	rclone, _ := NewRClone(config)
 
-    return &S3FS{
-        loopbackPath: loopbackPath,
-        mountPath:    mountPath,
-        fhmap:        make(map[string][]*S3File),
-        logger:       config.NewLogger("FUSE: " + mountPath),
-        config:       config,
-        rclone:       rclone,
-    }
+	return &S3FS{
+		loopbackPath: loopbackPath,
+		mountPath:    mountPath,
+		fhmap:        make(map[string][]*S3File),
+		logger:       config.NewLogger("FUSE: " + mountPath + " | "),
+		config:       config,
+		rclone:       rclone,
+	}
 }
 
 /// We want to run this function in a goroutine
 /// This function manages 1 Rule for 1 mountpoint
 func (fs *S3FS) Run(debug bool) error {
 
+	if err := os.Mkdir(fs.mountPath, 755); err != nil {
+		log.Printf("Cannot create filesystem root node: %v must be an empty path", fs.mountPath)
+		return err
+	}
+
 	loopbackRoot, err := NewS3Root(fs.loopbackPath, fs)
-    if err != nil {
-        return err
-    }
+	if err != nil {
+		return err
+	}
 
 	opts := &fuseFs.Options{}
 
@@ -81,7 +86,16 @@ func (fs *S3FS) Run(debug bool) error {
 }
 
 func (fs *S3FS) Stop() error {
-	return fs.server.Unmount()
+	err := fs.server.Unmount()
+	if err != nil {
+		fs.logger.Printf("Error unmounting '%v': %v", fs.mountPath, err)
+	}
+
+	if err := os.Remove(fs.mountPath); err != nil {
+		fs.logger.Printf("Error removing root filesystem node '%v': %v", fs.mountPath, err)
+	}
+
+	return err
 }
 
 // We have 7 Hooks on the Fuse calls
@@ -99,7 +113,7 @@ func (fs *S3FS) Rename(oldPath, newPath string) error {
 	fs.logger.Printf("Rename: %v -> %v\n", oldPath, newPath)
 
 	// If the path does not point to a file, then we don't treat it
-	if !fs.regFile(oldPath) {
+	if !IsRegFile(oldPath) {
 		return nil
 	}
 
@@ -120,12 +134,12 @@ func (fs *S3FS) Unlink(path string) error {
 	fs.logger.Printf("Unlink: %v\n", path)
 
 	// If the path does not point to a file, then we don't treat it
-	if !fs.regFile(path) {
+	if !IsRegFile(path) {
 		return nil
 	}
 
 	db := Open(fs.config)
-    rule := GetRule(db, path)
+	rule := GetRule(db, path)
 
 	var entries []S3NodeTable
 	db.Where("Path = ?", path).Limit(1).Find(&entries)
@@ -180,7 +194,7 @@ func (fs *S3FS) Download(path string) error {
 	fs.logger.Printf("Download: %v\n", path)
 
 	// If the path does not point to a file, then we don't treat it
-	if !fs.regFile(path) {
+	if !IsRegFile(path) {
 		return nil
 	}
 
@@ -197,9 +211,9 @@ func (fs *S3FS) Download(path string) error {
 	fs.lockFHs(path)
 	defer fs.unlockFHs(path)
 
-    if err := syscall.Unlink(path); err != nil {
-        fs.logger.Println("Error removing dummy file", err)
-    }
+	if err := syscall.Unlink(path); err != nil {
+		fs.logger.Println("Error removing dummy file", err)
+	}
 
 	if err := fs.rclone.Download(entry, rule); err != nil {
         fs.logger.Println("Error while downloading the file", err)
@@ -249,19 +263,19 @@ func (fs *S3FS) RegisterFH(fh *S3File) error {
 	fs.logger.Printf("RegisterFH: %v\n", fh)
 
 	// If the file handle does not point to a file, we do not register it
-	if !fs.regFile(fh.Path) {
+	if !IsRegFile(fh.Path) {
 		return nil
 	}
 
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
 
-    // Check that we don't have already the file handle in the map
-    // If we do, and we don't check this we will lock twice the same mutex
-    // and we will have a deadlock
-    if slices.Index(fs.fhmap[fh.Path], fh) != -1 {
-        return nil
-    }
+	// Check that we don't have already the file handle in the map
+	// If we do, and we don't check this we will lock twice the same mutex
+	// and we will have a deadlock
+	if slices.Index(fs.fhmap[fh.Path], fh) != -1 {
+		return nil
+	}
 
 	if _, ok := fs.fhmap[fh.Path]; !ok {
 		fs.fhmap[fh.Path] = make([]*S3File, 0)
@@ -292,47 +306,9 @@ func (fs *S3FS) UnregisterFH(fh *S3File) error {
 	if len(fs.fhmap[fh.Path]) == 1 {
 		delete(fs.fhmap, fh.Path)
 	} else {
-        fs.fhmap[fh.Path] = slices.Delete(fs.fhmap[fh.Path], index, index+2)
+		fs.fhmap[fh.Path] = slices.Delete(fs.fhmap[fh.Path], index, index+2)
 	}
 
-	return nil
-}
-
-// Does almost the same as Download
-// But is triggered by the sender goroutine
-// And obviously sends the file to the remote
-func (fs *S3FS) SendRemote(path string, server string) error {
-
-	// If the path does not point to a file, then we don't treat it
-	if !fs.regFile(path) {
-		return nil
-	}
-
-	db := Open(fs.config)
-	entry := GetEntry(db, path)
-	rule := GetRule(db, path)
-
-	// The file does not need to be tracked or the file is local
-	if entry == nil || entry.IsLocal {
-		return nil
-	}
-
-	// Lock all file handle related to the file
-	fs.lockFHs(path)
-	defer fs.unlockFHs(path)
-
-    if err := fs.rclone.Send(entry, rule); err != nil {
-        fs.logger.Printf("Could not send the file %v to the remote %v", path, server)
-    }
-	// Maybe flock the file but not sure if rclone will work as it will be a child process
-
-
-	// Replace all file descriptor by the new ones
-	if err := fs.reloadFds(path); err != nil {
-		return err
-	}
-
-	SendToServer(db, entry, server)
 	return nil
 }
 
@@ -363,16 +339,6 @@ func (fs *S3FS) reloadFds(path string) error {
 	}
 
 	return nil
-}
-
-func (fs *S3FS) regFile(path string) bool {
-	stat, err := os.Stat(path)
-	if err != nil {
-		fs.logger.Printf("Error statting file: %v\n", err)
-		return false
-	}
-
-	return stat.Mode().IsRegular()
 }
 
 func (fs *S3FS) catchSignals() {

@@ -11,6 +11,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/blang/semver"
 	"github.com/rhysd/go-github-selfupdate/selfupdate"
+	"github.com/robfig/cron"
 )
 
 const version = "0.0.1"
@@ -29,6 +30,7 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 
 	config, err := LoadConfig(ctx.ConfigPath.GetAgentConfigPath())
 	if err != nil {
+		log.Println("Cannot load config", err)
 		return err
 	}
 
@@ -41,14 +43,34 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 	dbEntry := AddIfNotExistsRule(db, rule.Src)
 	loopback := ctx.ConfigPath.GetLoopbackFSPath(dbEntry.UUID)
 
-    if !IsDirectory(rule.Src) {
-        if err := os.Mkdir(rule.Src, 0755); err != nil {
-            return err
-        }
-    }
+	if _, err := os.Stat(rule.Src); os.IsExist(err) {
+
+		if err := importFS(rule, ctx.ConfigPath); err != nil {
+			return err
+		}
+
+		if _, err := os.Stat(rule.Src); os.IsExist(err) {
+			log.Println("Cannot mount destination: file exists: ", rule.Src)
+		}
+	}
 
 	fs := NewS3FS(loopback, rule.Src, ctx.ConfigPath)
-	return fs.Run(ctx.ConfigPath.debug)
+	sender, err := NewS3Sender(&rule, fs, config.ExcludePatterns, ctx.ConfigPath)
+	if err != nil {
+		log.Println("Failed to create Cron sender", err)
+		return err
+	}
+
+	cron := cron.New()
+	cron.AddFunc(rule.CronSender, sender.Cycle)
+	cron.Start()
+
+	if err := fs.Run(ctx.ConfigPath.debug); err != nil {
+		log.Printf("Cannot mount filesystem at pas %v", err )
+	}
+
+	cron.Stop()
+	return nil
 }
 
 type TestRuleCmd struct {
@@ -125,8 +147,14 @@ func (cmd *ImportConfigCmd) Run(ctx *Context) error {
 		log.Fatalln(err)
 	}
 
-	err = SaveConfig(ctx.ConfigPath.GetAgentConfigPath(), config)
-	return err
+	for _, rule := range config.Rules {
+		if _, err := os.Stat(rule.Src); os.IsExist(err) {
+			// A folder exists, import it into the loopback folder and in the DB
+			importFS(rule, ctx.ConfigPath)
+		}
+	}
+
+	return SaveConfig(ctx.ConfigPath.GetAgentConfigPath(), config)
 }
 
 type CLI struct {
@@ -158,10 +186,10 @@ func doSelfUpdate() {
 }
 
 func main() {
-    cli := &CLI{
-        Debug: false,
-        ConfigFolder: "",
-    }
+	cli := &CLI{
+		Debug:        false,
+		ConfigFolder: "",
+	}
 	ctx := kong.Parse(cli)
 	err := ctx.Run(&Context{ConfigPath: NewConfigPath(&cli.ConfigFolder, cli.Debug)})
 	ctx.FatalIfErrorf(err)

@@ -12,6 +12,7 @@ require github.com/rhysd/go-github-selfupdate v1.2.2
 require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/google/uuid v1.3.0
+	github.com/robfig/cron v1.2.0
 	golang.org/x/exp v0.0.0-20220613132600-b0d781184e0d
 	golang.org/x/sys v0.0.0-20211019181941-9d821ace8654
 	gopkg.in/ini.v1 v1.66.6
