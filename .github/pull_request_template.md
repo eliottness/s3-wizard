@@ -4,6 +4,6 @@ Closes #Todo
 
 ## Todo before merge
 
--[x] Test it !
+- [x] Test it !
 
 ## Todo in another PR (optional)
