@@ -18,16 +18,16 @@ rclone:
 	cp "${RCLONE_ARCHIVE}/rclone" .
 	rm -rf "${RCLONE_ARCHIVE}.zip" "${RCLONE_ARCHIVE}"
 
-build: rclone
+build:
 	go build -o s3-agent .
 
 run: rclone
 	go run .
 
-test: build
+test: build rclone
 	pytest tests/
 
 clean:
 	rm -rf s3-agent rclone tests/__pycache__ .pytest_cache
 
-.PHONY: all rclone build run test clean
+.PHONY: all build run test clean
