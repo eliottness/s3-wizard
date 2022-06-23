@@ -8,6 +8,8 @@ import time
 
 
 NB_TRY = 5
+FILESYSTEM_PATH = './tmp'
+
 
 def run_command(cmd, stdout=None, stderr=None, code=None):
     process = subprocess.run(cmd.split(' '), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -21,62 +23,56 @@ def run_command(cmd, stdout=None, stderr=None, code=None):
 
 @pytest.fixture(scope='class')
 def handle_server():
-    ### Setup ###
-    cmd = 'docker run -d --name dev-s3 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin -p 9000:9000 -p 9001:9001 minio/minio:latest server /data --console-address ":9001"'
-    run_command(cmd, code=0)
+    ### SETUP ###
+    run_command('docker compose -f tests/docker-compose.yml up -d', code=0)
 
     yield
 
-    ### Teardown ###
-    run_command('docker rm -f dev-s3', code=0)
+    ### TEARDOWN ###
+    run_command('docker compose -f tests/docker-compose.yml down', code=0)
 
 
 @pytest.fixture(scope='function')
-def handle_agent():
-    ### Setup ###
+def handle_agent(request):
+    ### SETUP ###
     # Todo: find a way to not have to fully reset env, then delete those lines
     s3_agent_path = os.path.join(os.path.expanduser('~'), '.s3-agent')
     run_command(f'rm -rf {s3_agent_path}', code=0)
-    run_command('./s3-agent config import config.json', code=0)
+    run_command(f'./s3-agent config import {request.param}', code=0)
 
     # Run s3-agent in sync mode
+    # Todo: Pass config through CLI option once it works
     process = subprocess.Popen('./s3-agent sync'.split(' '))
 
     # Wait for our the filesystem to be ready
     nb_try = 0
-    while not os.path.exists('./hello') and nb_try < NB_TRY:
+    while not os.path.exists(FILESYSTEM_PATH) and nb_try < NB_TRY:
         time.sleep(0.1)
         nb_try += 1
-    assert os.path.exists('./hello'), 'FS could not be mounted by s3-agent'
+    assert os.path.exists(FILESYSTEM_PATH), 'FS could not be mounted by s3-agent'
 
     yield
 
-    ### Teardown ###
+    ### TEARDOWN ###
     process.send_signal(subprocess.signal.SIGTERM)
-    run_command(f'rm -rf ./hello', code=0)
+    run_command(f'rm -rf {FILESYSTEM_PATH}', code=0)
 
 
 ######################## TESTS ########################
 
 
 @pytest.mark.usefixtures('handle_server')
-@pytest.mark.usefixtures('handle_agent')
 class TestS3AgentClass:
 
-    def test_simple_file(self):
-        assert True
-        # filename = 'test.txt'
-        # config_name = 'simpleconfig.json'
-        # tmp_folder_name = 'tmp'
-        # db_path = 'db/'
+    @pytest.mark.parametrize('handle_agent', ['tests/data/simple_config.json'], indirect=True)
+    def test_simple_file(self, handle_agent):
+        ### GIVEN ###
+        with open(f'{FILESYSTEM_PATH}/test_simple_file.txt', 'w') as file:
+            file.write('Hello world')
 
-        # # Starting the test
-        # os.mkdir(tmp_folder_name)
-        # os.mknod(tmp_folder_name + filename)
+        ### WHEN ###
+        time.sleep(5)
 
-        # process = run_command(f'./{BINARY} --config-folder={CONFIG_PATH} sync')
-
-        # # Connect to the DB to check its content
-        # # con = sqlite3.connect('example.db')
-
-        # os.rmdir(tmp_folder_name)
+        ### THEN ###
+        with open(f'{FILESYSTEM_PATH}/test_simple_file.txt') as file:
+            assert file.readlines()[0] == 'Hello world'
