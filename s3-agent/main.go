@@ -85,11 +85,6 @@ func (cmd *TestRuleCmd) Run(ctx *Context) error {
 		return err
 	}
 
-    file, err := os.Stat(cmd.Path)
-    if err != nil {
-        return err
-    }
-
     for _, rule := range config.Rules {
         if string(rule.Type) == cmd.Rule {
             // Get absolute path of the filesystem root handled by the rule
@@ -111,7 +106,7 @@ func (cmd *TestRuleCmd) Run(ctx *Context) error {
                 }
             }
 
-            if !file.IsDir() {
+            if !IsDirectory(cmd.Path) {
                 printResults(cmd.Path)
             } else {
                 filepath.Walk(cmd.Path, func(path string, info os.FileInfo, err error) error {
