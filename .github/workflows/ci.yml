@@ -19,6 +19,11 @@ jobs:
       with:
         go-version: 1.18
 
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.8
+
     - name: Verify dependencies
       run: cd s3-agent && go mod verify
 
@@ -33,6 +38,11 @@ jobs:
 
     - name: Run golint
       run: cd s3-agent && golangci-lint run --fast
+
+    - name: Set up test env
+      uses: BSFishy/pip-action@v1
+      with:
+        requirements: s3-agent/tests/requirements.txt
 
     - name: Run tests
       run: cd s3-agent && make test
