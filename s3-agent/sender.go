@@ -63,6 +63,8 @@ func (s *S3Sender) SendRemote(db *gorm.DB, entry *S3NodeTable) error {
 		return nil
 	}
 
+    s.logger.Printf("Sending file: %v -> %v", entry.Path, s.rule.Dest)
+
 	// Lock all file handle related to the file
 	s.fs.lockFHs(entry.Path)
 	defer s.fs.unlockFHs(entry.Path)
