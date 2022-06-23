@@ -1,7 +1,14 @@
+#####################################################################
+############################# VARIABLES #############################
+#####################################################################
 
 RCLONE_VERSION=v1.58.1
 RCLONE_ARCH=linux-amd64
 RCLONE_ARCHIVE=rclone-${RCLONE_VERSION}-${RCLONE_ARCH}
+
+#####################################################################
+############################### RULES ###############################
+#####################################################################
 
 all: build
 
@@ -18,7 +25,9 @@ run: rclone
 	go run .
 
 test: build
-	pytest ../tests
+	pytest tests/
 
 clean:
-	rm -f s3-agent rclone
+	rm -rf s3-agent rclone tests/__pycache__ .pytest_cache
+
+.PHONY: all rclone build run test clean
