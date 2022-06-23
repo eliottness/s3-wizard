@@ -131,10 +131,10 @@ func doSelfUpdate() {
 }
 
 func main() {
-    cli := &CLI{
-        Debug: false,
-        ConfigFolder: "",
-    }
+	cli := &CLI{
+		Debug:        false,
+		ConfigFolder: "",
+	}
 	ctx := kong.Parse(cli)
 	err := ctx.Run(&Context{ConfigPath: NewConfigPath(&cli.ConfigFolder, cli.Debug)})
 	ctx.FatalIfErrorf(err)

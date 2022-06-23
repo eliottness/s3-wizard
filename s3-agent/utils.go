@@ -18,8 +18,8 @@ func futimens(fd int, times *[2]syscall.Timespec) (err error) {
 }
 
 func IsDirectory(path string) bool {
-    fo, err := os.Stat(path);
-    return err == nil && fo.IsDir()
+	fo, err := os.Stat(path)
+	return err == nil && fo.IsDir()
 }
 
 func IsRegFile(path string) bool {

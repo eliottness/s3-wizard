@@ -56,7 +56,7 @@ type Rule struct {
 	// destination path: must be a valid server name
 	Dest string `json:"dest"`
 
-	// Cron to send the values 
+	// Cron to send the values
 	// See Cron format: https://pkg.go.dev/github.com/robfig/cron
 	CronSender string `json:"cron-sender`
 }
@@ -99,7 +99,7 @@ func SaveConfig(path string, config *Config) error {
 	if err = json.NewEncoder(file).Encode(config); err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -107,9 +107,9 @@ func SaveConfig(path string, config *Config) error {
 func (config *Config) IsValid() error {
 
 	for _, rule := range config.Rules {
-        if !slices.Contains(config.Servers, rule.Dest) {
-            return fmt.Errorf("Rule with source '%s': No server named '%s'", rule.Src, rule.Dest)
-        }
+		if !slices.Contains(config.Servers, rule.Dest) {
+			return fmt.Errorf("Rule with source '%s': No server named '%s'", rule.Src, rule.Dest)
+		}
 	}
 
 	if len(config.Servers) == 0 {
@@ -129,45 +129,45 @@ func (config *Config) IsValid() error {
 
 func (rule *Rule) MustBeRemote(path string) bool {
 
-    switch rule.Type {
-    case OLDER_THAN:
-        return rule.olderThan(path)
-    case NEWER_THAN:
-        return rule.newerThan(path)
-    default:
-        panic(fmt.Errorf("Rule type '%s' not implemented", rule.Type))
-    }
+	switch rule.Type {
+	case OLDER_THAN:
+		return rule.olderThan(path)
+	case NEWER_THAN:
+		return rule.newerThan(path)
+	default:
+		panic(fmt.Errorf("Rule type '%s' not implemented", rule.Type))
+	}
 
 }
 
 func (rule *Rule) olderThan(path string) bool {
 
-    fo, err := os.Stat(path)
-    if err != nil {
-        return false
-    }
+	fo, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
 
-    paramsDuration, err := time.ParseDuration(rule.Params)
-    if err != nil {
-        return false
-    }
+	paramsDuration, err := time.ParseDuration(rule.Params)
+	if err != nil {
+		return false
+	}
 
-    fileModDuration := time.Now().Sub(fo.ModTime())
-    return paramsDuration <= fileModDuration
+	fileModDuration := time.Now().Sub(fo.ModTime())
+	return paramsDuration <= fileModDuration
 }
 
 func (rule *Rule) newerThan(path string) bool {
 
-    fo, err := os.Stat(path)
-    if err != nil {
-        return false
-    }
+	fo, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
 
-    paramsDuration, err := time.ParseDuration(rule.Params)
-    if err != nil {
-        return false
-    }
+	paramsDuration, err := time.ParseDuration(rule.Params)
+	if err != nil {
+		return false
+	}
 
-    fileModDuration := time.Now().Sub(fo.ModTime())
-    return paramsDuration >= fileModDuration
+	fileModDuration := time.Now().Sub(fo.ModTime())
+	return paramsDuration >= fileModDuration
 }

@@ -27,20 +27,20 @@ type S3FS struct {
 	config *ConfigPath
 
 	server *fuse.Server
-    rclone *RClone
+	rclone *RClone
 }
 
 func NewS3FS(loopbackPath, mountPath string, config *ConfigPath) *S3FS {
-    rclone, _ := NewRClone(config)
+	rclone, _ := NewRClone(config)
 
-    return &S3FS{
-        loopbackPath: loopbackPath,
-        mountPath:    mountPath,
-        fhmap:        make(map[string][]*S3File),
-        logger:       config.NewLogger("FUSE: " + mountPath + " | "),
-        config:       config,
-        rclone:       rclone,
-    }
+	return &S3FS{
+		loopbackPath: loopbackPath,
+		mountPath:    mountPath,
+		fhmap:        make(map[string][]*S3File),
+		logger:       config.NewLogger("FUSE: " + mountPath + " | "),
+		config:       config,
+		rclone:       rclone,
+	}
 }
 
 /// We want to run this function in a goroutine
@@ -53,9 +53,9 @@ func (fs *S3FS) Run(debug bool) error {
 	}
 
 	loopbackRoot, err := NewS3Root(fs.loopbackPath, fs)
-    if err != nil {
-        return err
-    }
+	if err != nil {
+		return err
+	}
 
 	opts := &fuseFs.Options{}
 
@@ -139,7 +139,7 @@ func (fs *S3FS) Unlink(path string) error {
 	}
 
 	db := Open(fs.config)
-    rule := GetRule(db, path)
+	rule := GetRule(db, path)
 
 	var entries []S3NodeTable
 	db.Where("Path = ?", path).Limit(1).Find(&entries)
@@ -208,9 +208,9 @@ func (fs *S3FS) Download(path string) error {
 	fs.lockFHs(path)
 	defer fs.unlockFHs(path)
 
-    if err := syscall.Unlink(path); err != nil {
-        fs.logger.Println("Error removing dummy file", err)
-    }
+	if err := syscall.Unlink(path); err != nil {
+		fs.logger.Println("Error removing dummy file", err)
+	}
 
 	fs.rclone.Download(entry, rule)
 	// Maybe flock the file but not sure if rclone will work as it will be a child process
@@ -265,12 +265,12 @@ func (fs *S3FS) RegisterFH(fh *S3File) error {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
 
-    // Check that we don't have already the file handle in the map
-    // If we do, and we don't check this we will lock twice the same mutex
-    // and we will have a deadlock
-    if slices.Index(fs.fhmap[fh.Path], fh) != -1 {
-        return nil
-    }
+	// Check that we don't have already the file handle in the map
+	// If we do, and we don't check this we will lock twice the same mutex
+	// and we will have a deadlock
+	if slices.Index(fs.fhmap[fh.Path], fh) != -1 {
+		return nil
+	}
 
 	if _, ok := fs.fhmap[fh.Path]; !ok {
 		fs.fhmap[fh.Path] = make([]*S3File, 0)
@@ -301,7 +301,7 @@ func (fs *S3FS) UnregisterFH(fh *S3File) error {
 	if len(fs.fhmap[fh.Path]) == 1 {
 		delete(fs.fhmap, fh.Path)
 	} else {
-        fs.fhmap[fh.Path] = slices.Delete(fs.fhmap[fh.Path], index, index+2)
+		fs.fhmap[fh.Path] = slices.Delete(fs.fhmap[fh.Path], index, index+2)
 	}
 
 	return nil

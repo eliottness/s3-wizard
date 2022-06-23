@@ -100,7 +100,7 @@ func (r *RClone) Run(args []string) (int, error) {
 	}
 
 	// Add the config path
-	args = append(args, "--config='" + r.config.GetRClonePath() + "'")
+	args = append(args, "--config='"+r.config.GetRClonePath()+"'")
 
 	if err := execveAt(r.fd, args); err != nil {
 		return -1, err
@@ -112,46 +112,46 @@ func (r *RClone) Run(args []string) (int, error) {
 }
 
 func (r *RClone) getS3Path(entry *S3NodeTable, rule *S3RuleTable) (string, error) {
-    config, err := LoadConfig(r.config.GetRClonePath())
+	config, err := LoadConfig(r.config.GetRClonePath())
 
-    if err != nil {
-        return "", err
-    }
+	if err != nil {
+		return "", err
+	}
 
-    bucket := config.RCloneConfig[entry.Server]["bucket"]
+	bucket := config.RCloneConfig[entry.Server]["bucket"]
 
-    return filepath.Join(bucket, "s3-agent", rule.UUID, entry.UUID), err
+	return filepath.Join(bucket, "s3-agent", rule.UUID, entry.UUID), err
 }
 
 func (r *RClone) Send(entry *S3NodeTable, rule *S3RuleTable) error {
-    s3Path, err := r.getS3Path(entry, rule)
+	s3Path, err := r.getS3Path(entry, rule)
 
-    if err != nil {
-        return err
-    }
+	if err != nil {
+		return err
+	}
 
-    _, err = r.Run([]string{"move", entry.Path, entry.Server + ":" + s3Path})
-    return err
+	_, err = r.Run([]string{"move", entry.Path, entry.Server + ":" + s3Path})
+	return err
 }
 
 func (r *RClone) Download(entry *S3NodeTable, rule *S3RuleTable) error {
-    s3Path, err := r.getS3Path(entry, rule)
+	s3Path, err := r.getS3Path(entry, rule)
 
-    if err != nil {
-        return err
-    }
+	if err != nil {
+		return err
+	}
 
-    _, err = r.Run([]string{"move", entry.Server + ":" + s3Path, entry.Path})
-    return err
+	_, err = r.Run([]string{"move", entry.Server + ":" + s3Path, entry.Path})
+	return err
 }
 
 func (r *RClone) Remove(entry *S3NodeTable, rule *S3RuleTable) error {
-    s3Path, err := r.getS3Path(entry, rule)
+	s3Path, err := r.getS3Path(entry, rule)
 
-    if err != nil {
-        return err
-    }
+	if err != nil {
+		return err
+	}
 
-    _, err = r.Run([]string{"deletefile", entry.Server + ":" + s3Path})
-    return err
+	_, err = r.Run([]string{"deletefile", entry.Server + ":" + s3Path})
+	return err
 }
