@@ -58,7 +58,7 @@ type Rule struct {
 
 	// Cron to send the values
 	// See Cron format: https://pkg.go.dev/github.com/robfig/cron
-	CronSender string `json:"cron-sender`
+	CronSender string `json:"cron-sender"`
 }
 
 type Config struct {
