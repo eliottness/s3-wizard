@@ -12,6 +12,7 @@ require github.com/rhysd/go-github-selfupdate v1.2.2
 require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/google/uuid v1.3.0
+	github.com/robfig/cron v1.2.0
 	golang.org/x/exp v0.0.0-20220613132600-b0d781184e0d
 	golang.org/x/sys v0.0.0-20211019181941-9d821ace8654
 	gopkg.in/ini.v1 v1.66.6
@@ -28,7 +29,6 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/mattn/go-sqlite3 v1.14.13 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/robfig/cron v1.2.0 // indirect
 	github.com/tcnksm/go-gitconfig v0.1.2 // indirect
 	github.com/ulikunitz/xz v0.5.5 // indirect
 	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2 // indirect
