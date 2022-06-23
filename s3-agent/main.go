@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"syscall"
 
 	"github.com/alecthomas/kong"
@@ -49,7 +48,7 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 
 	if _, err := os.Stat(rule.Src); os.IsExist(err) {
 
-		if err := importFS(rule); err != nil {
+		if err := importFS(rule, ctx.ConfigPath); err != nil {
 			return err
 		}
 
@@ -68,14 +67,13 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 	cron := cron.New()
 	cron.AddFunc(rule.CronSender, sender.Cycle)
 	cron.Start()
+	
+	if err := fs.Run(ctx.ConfigPath.debug); err != nil {
+		log.Printf("Cannot mount filesystem at pas %v", err )
+	}
 
-	go fs.Run(ctx.ConfigPath.debug)
-	sender.Cycle()
-	// if err != nil {
-	// 	log.Printf("Cannot mount filesystem at pas %v", err )
-	// }
-
-	return err
+	cron.Stop()
+	return nil
 }
 
 type ConfigCmd struct {
@@ -96,6 +94,7 @@ func (cmd *ImportConfigCmd) Run(ctx *Context) error {
 
 	for _, rule := range config.Rules {
 		if _, err := os.Stat(rule.Src); os.IsExist(err) {
+			// A folder exists, import it into the loopback folder and in the DB
 			importFS(rule, ctx.ConfigPath)
 		}
 	}
