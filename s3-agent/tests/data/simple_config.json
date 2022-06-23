@@ -24,6 +24,5 @@
             "acl": "public-read-write",
             "bucket": "bucket-test"
         }
-    },
-    "sqlite.db": "db/"
+    }
 }
