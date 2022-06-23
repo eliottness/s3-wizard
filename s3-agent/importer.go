@@ -29,7 +29,16 @@ func importFS(rule Rule, config *ConfigPath) error {
 		return err
 	}
 
-	return customWalk(rule.Src,
+	// Creates all folders
+	err = customWalkDir(rule.Src, func(oldPath string, info os.FileInfo) error {
+		newPath := filepath.Join(loopbackRoot, oldPath[len(rule.Src):])
+		return os.Mkdir(newPath, info.Mode())
+	})
+	if err != nil {
+		return err
+	}
+
+	return customWalkFile(rule.Src,
 		func(oldPath string, info os.FileInfo) error {
 			newPath := filepath.Join(loopbackRoot, oldPath[len(rule.Src):])
 
@@ -47,13 +56,39 @@ func importFS(rule Rule, config *ConfigPath) error {
 				return os.Symlink(pointedNewPath, newPath)
 			}
 
+			// if this rename fails it's ok, it's only some sockets or special files
 			os.Rename(oldPath, newPath)
 			return nil
 		},
 	)
 }
 
-func customWalk(dirPath string, walkFunc customWalkFunc) error {
+/// Walk only folders
+func customWalkDir(dirPath string, walkFunc customWalkFunc) error {
+
+	nodes, err := ioutil.ReadDir(dirPath)
+	if err != nil {
+		return err
+	}
+
+	for _, node := range nodes {
+		nodePath := filepath.Join(dirPath, node.Name())
+		if !node.Mode().IsDir() {
+			continue
+		}
+		if err := walkFunc(nodePath, node); err != nil {
+			return err
+		}
+		if err := customWalkDir(nodePath, walkFunc); err != nil {
+			return err
+		}
+
+	}
+	return nil
+}
+
+
+func customWalkFile(dirPath string, walkFunc customWalkFunc) error {
 
 	nodes, err := ioutil.ReadDir(dirPath)
 	if err != nil {
@@ -63,13 +98,13 @@ func customWalk(dirPath string, walkFunc customWalkFunc) error {
 	for _, node := range nodes {
 		nodePath := filepath.Join(dirPath, node.Name())
 		if node.Mode().IsDir() {
-			if err := customWalk(nodePath, walkFunc); err != nil {
+			if err := customWalkFile(nodePath, walkFunc); err != nil {
 				return err
 			}
-		}
-
-		if err := walkFunc(nodePath, node); err != nil {
-			return err
+		} else {
+			if err := walkFunc(nodePath, node); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
