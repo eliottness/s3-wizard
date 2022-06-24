@@ -85,7 +85,7 @@ def handle_agent(request):
     connection.close()
     process.send_signal(subprocess.signal.SIGTERM)
     process.wait()
-    run_command(f'rm -rf {FILESYSTEM_PATH}', code=0)
+    run_command(f'test -e {FILESYSTEM_PATH}', code=1)
 
 
 ######################## TESTS ########################
