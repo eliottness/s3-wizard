@@ -73,8 +73,6 @@ func (s *S3Sender) SendRemote(db *gorm.DB, entry *S3NodeTable) error {
 	s.fs.lockFHs(entry.Path)
 	defer s.fs.unlockFHs(entry.Path)
 
-	s.fs.rclone.Send(entry)
-
 	if err := syscall.Truncate(entry.Path, 0); err != nil {
 		s.logger.Println("Error truncating the file locally", err)
 	}
@@ -86,6 +84,7 @@ func (s *S3Sender) SendRemote(db *gorm.DB, entry *S3NodeTable) error {
 	}
 
 	SendToServer(db, entry, s.rule.Dest)
+	s.fs.rclone.Send(entry)
 	return nil
 }
 

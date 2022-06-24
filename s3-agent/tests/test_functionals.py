@@ -22,10 +22,11 @@ def run_command(cmd, stdout=None, stderr=None, code=None):
 
 
 def assert_rclone_file(cursor, filename):
-    s3_file_path = os.path.join(get_rule_entry(cursor)[1], filename)
+    cursor.execute("SELECT * FROM s3_node_tables WHERE path LIKE '%'||?||'%'", (filename,))
+    s3_file_path = os.path.join(cursor.fetchone()[3], filename)
     rclone_config_path = os.path.join(S3_AGENT_PATH, 'rclone.conf.tmp')
-    cmd = f'./rclone --config {rclone_config_path} lsf remote:bucket-test/{s3_file_path}'
-    run_command(cmd, stdout=filename, stderr='', code=0)
+    cmd = f'./rclone --config {rclone_config_path} lsf remote:bucket-test/s3-agent/{s3_file_path}'
+    run_command(cmd, stdout=filename + '\n', stderr='', code=0)
 
 
 def assert_entry_state(cursor, filename, size, Local, server):
@@ -35,13 +36,6 @@ def assert_entry_state(cursor, filename, size, Local, server):
     assert row[1] == size, row
     assert row[2] == Local, row
     assert row[4] == server, row
-
-
-def get_rule_entry(cursor):
-    cursor.execute("SELECT * FROM s3_rule_tables")
-    ruleEntry = cursor.fetchone()
-    assert ruleEntry is not None
-    return ruleEntry
 
 
 ####################### FIXTURES ######################
