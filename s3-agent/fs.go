@@ -219,10 +219,12 @@ func (fs *S3FS) Download(path string) error {
 
 	if err := syscall.Unlink(path); err != nil {
 		fs.logger.Println("Error removing dummy file", err)
+        return err
 	}
 
 	if err := fs.rclone.Download(entry); err != nil {
 		fs.logger.Println("Error while downloading the file", err)
+        return err
 	}
 	// Maybe flock the file but not sure if rclone will work as it will be a child process
 

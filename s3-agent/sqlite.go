@@ -70,8 +70,8 @@ func NewEntry(rulePath, path string, size int64) *S3NodeTable {
 }
 
 /// Tell the DB that the file is remote now
-func SendToServer(db *gorm.DB, entry *S3NodeTable, server string) {
-	db.Model(entry).Where("Path = ?", entry.Path).Update("Server", server).Update("Local", false)
+func SendToServer(db *gorm.DB, entry *S3NodeTable, server string, size int64) {
+	db.Model(entry).Where("Path = ?", entry.Path).Update("Server", server).Update("Local", false).Update("Size", size)
 }
 
 func IsEntryLocal(db *gorm.DB, path string) bool {
