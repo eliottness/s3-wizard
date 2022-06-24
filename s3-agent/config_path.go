@@ -27,8 +27,8 @@ func NewConfigPath(userSpecifiedOne *string, debug bool) *ConfigPath {
 	if _, err := os.Stat(configDir); os.IsNotExist(err) {
 		// We don't want anyone to read our config since it will contains credentials
 		if err = os.Mkdir(configDir, 0700); err != nil {
-            return nil
-        }
+			return nil
+		}
 	}
 
 	return &ConfigPath{configDir, debug}

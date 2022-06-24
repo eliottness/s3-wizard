@@ -20,7 +20,7 @@ type Context struct {
 	ConfigPath *ConfigPath
 }
 
-type SyncCmd struct {}
+type SyncCmd struct{}
 
 func (cmd *SyncCmd) Run(ctx *Context) error {
 
@@ -35,8 +35,8 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 	}
 
 	if err = ctx.ConfigPath.WriteRCloneConfig(config.RCloneConfig); err != nil {
-        return err
-    }
+		return err
+	}
 
 	rule := config.Rules[0]
 	db := Open(ctx.ConfigPath)
@@ -82,51 +82,53 @@ type TestRuleCmd struct {
 }
 
 func (cmd *TestRuleCmd) Run(ctx *Context) error {
-    // Load config
-    config, err := LoadConfig(ctx.ConfigPath.GetAgentConfigPath())
+	// Load config
+	config, err := LoadConfig(ctx.ConfigPath.GetAgentConfigPath())
 	if err != nil {
 		return err
 	}
 
-    for _, rule := range config.Rules {
-        if string(rule.Type) == cmd.Rule {
-            // Get absolute path of the filesystem root handled by the rule
-            ruleSrc, err := filepath.Abs(rule.Src)
-            if err != nil {
-                return err
-            }
+	for _, rule := range config.Rules {
+		if string(rule.Type) == cmd.Rule {
+			// Get absolute path of the filesystem root handled by the rule
+			ruleSrc, err := filepath.Abs(rule.Src)
+			if err != nil {
+				return err
+			}
 
-            // The given file path is not in the rule filesystem
-            if relativePath, err := filepath.Rel(ruleSrc, cmd.Path); err != nil || strings.HasPrefix(relativePath, "..") {
-                log.Fatal("File is not part of the rule file system")
-            }
+			// The given file path is not in the rule filesystem
+			if relativePath, err := filepath.Rel(ruleSrc, cmd.Path); err != nil || strings.HasPrefix(relativePath, "..") {
+				log.Fatal("File is not part of the rule file system")
+			}
 
-            printResults := func(path string) {
-                if rule.MustBeRemote(path) {
-                    fmt.Printf("'%s' must be send to remote.\n", path)
-                } else {
-                    fmt.Printf("'%s' must not be send to remote.\n", path)
-                }
-            }
+			printResults := func(path string) {
+				if rule.MustBeRemote(path) {
+					fmt.Printf("'%s' must be send to remote.\n", path)
+				} else {
+					fmt.Printf("'%s' must not be send to remote.\n", path)
+				}
+			}
 
-            if !IsDirectory(cmd.Path) {
-                printResults(cmd.Path)
-            } else {
-                filepath.Walk(cmd.Path, func(path string, info os.FileInfo, err error) error {
-                    if err != nil {
-                        return err
-                    }
-                    if !info.IsDir() { printResults(path) }
-                    return nil
-                })
-            }
+			if !IsDirectory(cmd.Path) {
+				printResults(cmd.Path)
+			} else {
+				filepath.Walk(cmd.Path, func(path string, info os.FileInfo, err error) error {
+					if err != nil {
+						return err
+					}
+					if !info.IsDir() {
+						printResults(path)
+					}
+					return nil
+				})
+			}
 
-            return nil
-        }
-    }
+			return nil
+		}
+	}
 
-    log.Fatal("Given rule does not exist.")
-    return nil
+	log.Fatal("Given rule does not exist.")
+	return nil
 }
 
 type ConfigCmd struct {

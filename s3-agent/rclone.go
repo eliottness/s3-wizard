@@ -95,8 +95,8 @@ func (r *RClone) Run(args []string) (int, error) {
 		syscall.ForkLock.Unlock()
 		var wstatus syscall.WaitStatus
 		if _, err := syscall.Wait4(int(id), &wstatus, 0, nil); err != nil {
-            return -1, err
-        }
+			return -1, err
+		}
 
 		return int(wstatus.ExitStatus()), nil
 	}

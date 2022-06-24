@@ -87,7 +87,6 @@ func customWalkDir(dirPath string, walkFunc customWalkFunc) error {
 	return nil
 }
 
-
 func customWalkFile(dirPath string, walkFunc customWalkFunc) error {
 
 	nodes, err := ioutil.ReadDir(dirPath)
@@ -118,7 +117,7 @@ func importFile(oldPath, newPath string, info os.FileInfo, rule Rule, db *gorm.D
 	db.Model(&entry).Where("Path = ?", oldPath).Find(&entries)
 
 	if rule.MustBeRemote(oldPath) {
-        entry := GetEntry(db, oldPath)
+		entry := GetEntry(db, oldPath)
 		rclone.Send(entry)
 
 		if err := syscall.Truncate(entry.Path, 0); err != nil {
