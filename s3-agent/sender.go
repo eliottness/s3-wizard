@@ -46,13 +46,13 @@ func (s *S3Sender) Cycle() {
 	s.logger.Println("Running SEND Cycle")
 
 	db := Open(s.config)
-    var entries []S3NodeTable
+	var entries []S3NodeTable
 	db.Model(&S3NodeTable{}).Where("Local = ?", true).Where("Rulepath = ?", s.rule.Src).Find(&entries)
 
 	for _, entry := range entries {
-        if s.isPatternExcluded(entry.Path) {
-            continue
-        }
+		if s.isPatternExcluded(entry.Path) {
+			continue
+		}
 
 		if s.rule.MustBeRemote(entry.Path) {
 			s.SendRemote(db, &entry)
@@ -73,6 +73,9 @@ func (s *S3Sender) SendRemote(db *gorm.DB, entry *S3NodeTable) error {
 	s.fs.lockFHs(entry.Path)
 	defer s.fs.unlockFHs(entry.Path)
 
+	SendToServer(db, entry, s.rule.Dest)
+	s.fs.rclone.Send(entry)
+
 	if err := syscall.Truncate(entry.Path, 0); err != nil {
 		s.logger.Println("Error truncating the file locally", err)
 	}
@@ -83,8 +86,6 @@ func (s *S3Sender) SendRemote(db *gorm.DB, entry *S3NodeTable) error {
 		return err
 	}
 
-	SendToServer(db, entry, s.rule.Dest)
-	s.fs.rclone.Send(entry)
 	return nil
 }
 

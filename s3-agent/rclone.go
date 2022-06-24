@@ -113,7 +113,7 @@ func (r *RClone) Run(args []string) (int, error) {
 }
 
 func (r *RClone) getS3Path(entry *S3NodeTable) (string, error) {
-    config, err := LoadConfig(r.config.GetAgentConfigPath())
+	config, err := LoadConfig(r.config.GetAgentConfigPath())
 	if err != nil {
 		return "", err
 	}
@@ -130,19 +130,20 @@ func (r *RClone) Send(entry *S3NodeTable) error {
 		return err
 	}
 
-	_, err = r.Run([]string{"./rclone", "move", entry.Path, entry.Server + ":" + s3Path})
-    return err
+	_, err = r.Run([]string{"./rclone", "copy", entry.Path, entry.Server + ":" + s3Path})
+	return err
 }
 
 func (r *RClone) Download(entry *S3NodeTable) error {
-	s3Path, err := r.getS3Path(entry)
+	_, err := r.getS3Path(entry)
 
 	if err != nil {
 		return err
 	}
 
-	_, err = r.Run([]string{"./rclone", "move", entry.Server + ":" + s3Path, entry.Path})
-	return err
+	return nil
+	// _, err = r.Run([]string{"./rclone", "move", entry.Server + ":" + s3Path, entry.Path})
+	// return err
 }
 
 func (r *RClone) Remove(entry *S3NodeTable) error {
@@ -152,6 +153,6 @@ func (r *RClone) Remove(entry *S3NodeTable) error {
 		return err
 	}
 
-	_, err = r.Run([]string{"deletefile", entry.Server + ":" + s3Path})
+	_, err = r.Run([]string{"./rclone", "deletefile", entry.Server + ":" + s3Path})
 	return err
 }
