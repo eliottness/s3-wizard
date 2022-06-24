@@ -67,7 +67,10 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 
 	if err := fs.Run(ctx.ConfigPath.debug); err != nil {
 		log.Printf("Cannot mount filesystem at pas %v", err )
+        return err
 	}
+
+    fs.WaitStop()
 
 	cron.Stop()
 	return nil
