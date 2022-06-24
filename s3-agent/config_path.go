@@ -50,7 +50,7 @@ func (c *ConfigPath) WriteRCloneConfig(config map[string]map[string]string) erro
 		return err
 	}
 
-	return os.Chmod(c.GetRClonePath(), 600)
+	return os.Chmod(c.GetRClonePath(), 0600)
 }
 
 func (c *ConfigPath) GetRClonePath() string {

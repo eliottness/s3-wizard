@@ -20,14 +20,15 @@ type S3FS struct {
 	mountPath string
 
 	/// All file handle by paths
-	fhmap  map[string][]*S3File
-	mutex  sync.Mutex
-	logger *log.Logger
+	fhmap   map[string][]*S3File
+	mutex   sync.Mutex
+	logger  *log.Logger
 
-	config *ConfigPath
+	config  *ConfigPath
 
-	server *fuse.Server
-	rclone *RClone
+	server  *fuse.Server
+	rclone  *RClone
+    done    chan bool
 }
 
 func NewS3FS(loopbackPath, mountPath string, config *ConfigPath) *S3FS {
@@ -40,6 +41,7 @@ func NewS3FS(loopbackPath, mountPath string, config *ConfigPath) *S3FS {
 		logger:       config.NewLogger("FUSE: " + mountPath + " | "),
 		config:       config,
 		rclone:       rclone,
+        done:         make(chan bool),
 	}
 }
 
@@ -47,7 +49,7 @@ func NewS3FS(loopbackPath, mountPath string, config *ConfigPath) *S3FS {
 /// This function manages 1 Rule for 1 mountpoint
 func (fs *S3FS) Run(debug bool) error {
 
-	if err := os.Mkdir(fs.mountPath, 755); err != nil {
+	if err := os.Mkdir(fs.mountPath, 0755); err != nil {
 		log.Printf("Cannot create filesystem root node: %v must be an empty path", fs.mountPath)
 		return err
 	}
@@ -80,9 +82,13 @@ func (fs *S3FS) Run(debug bool) error {
 	fs.catchSignals()
 
 	fs.server = server
-	fs.server.Wait()
+	go fs.server.Wait()
 
 	return nil
+}
+
+func (fs *S3FS) WaitStop() {
+    <-fs.done
 }
 
 func (fs *S3FS) Stop() error {
@@ -91,9 +97,11 @@ func (fs *S3FS) Stop() error {
 		fs.logger.Printf("Error unmounting '%v': %v", fs.mountPath, err)
 	}
 
-	if err := os.Remove(fs.mountPath); err != nil {
+	if err := os.RemoveAll(fs.mountPath); err != nil {
 		fs.logger.Printf("Error removing root filesystem node '%v': %v", fs.mountPath, err)
 	}
+
+    fs.done<-true
 
 	return err
 }
