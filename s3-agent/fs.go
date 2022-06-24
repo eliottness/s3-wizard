@@ -97,7 +97,7 @@ func (fs *S3FS) Stop() error {
 		fs.logger.Printf("Error unmounting '%v': %v", fs.mountPath, err)
 	}
 
-	if err := os.RemoveAll(fs.mountPath); err != nil {
+	if err := os.Remove(fs.mountPath); err != nil {
 		fs.logger.Printf("Error removing root filesystem node '%v': %v", fs.mountPath, err)
 	}
 
