@@ -46,16 +46,21 @@ func (s *S3Sender) Cycle() {
 	s.logger.Println("Running SEND Cycle")
 
 	db := Open(s.config)
-	for entry := range s.findConcernedFiles(db) {
+    var entries []S3NodeTable
+	db.Model(&S3NodeTable{}).Where("Local = ?", true).Where("Rulepath = ?", s.rule.Src).Find(&entries)
+
+	for _, entry := range entries {
+        if s.isPatternExcluded(entry.Path) {
+            continue
+        }
+
 		if s.rule.MustBeRemote(entry.Path) {
-			s.SendRemote(db, entry)
+			s.SendRemote(db, &entry)
 		}
 	}
 }
 
 func (s *S3Sender) SendRemote(db *gorm.DB, entry *S3NodeTable) error {
-
-	s.logger.Printf("Sending file: %v -> %v", entry.Path, s.rule.Dest)
 
 	// The file does not need to be tracked or the file is already remote
 	if entry == nil || !entry.Local {
@@ -84,31 +89,12 @@ func (s *S3Sender) SendRemote(db *gorm.DB, entry *S3NodeTable) error {
 	return nil
 }
 
-func (s *S3Sender) findConcernedFiles(db *gorm.DB) chan *S3NodeTable {
-
-	var entries []S3NodeTable
-	db.Model(&S3NodeTable{}).Where("Local = ?", true).Where("Rulepath = ?", s.rule.Src).Find(&entries)
-
-	ch := make(chan *S3NodeTable)
-
-	for _, entry := range entries {
-
-		if s.isPatternExcluded(entry.Path) {
-			continue
-		}
-
-		ch <- &entry
-	}
-
-	return ch
-}
-
 func (s *S3Sender) isPatternExcluded(path string) bool {
 	for _, pattern := range s.excludePatterns {
 		if pattern.MatchString(path) {
-			return false
+			return true
 		}
 	}
 
-	return true
+	return false
 }
