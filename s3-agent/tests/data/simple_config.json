@@ -5,7 +5,7 @@
             "dest": "remote",
             "type": "OLDER_THAN",
             "params": "1s",
-            "cron-sender": "@hourly"
+            "cron-sender": "@every 2s"
         }
     ],
     "servers": ["remote"],

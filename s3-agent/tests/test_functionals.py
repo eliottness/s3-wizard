@@ -28,12 +28,12 @@ def assert_rclone_file(cursor, filename):
     run_command(cmd, stdout=filename, stderr='', code=0)
 
 
-def assert_entry_state(cursor, filename, size, isLocal, server):
+def assert_entry_state(cursor, filename, size, Local, server):
     cursor.execute("SELECT * FROM s3_node_tables WHERE path LIKE '%'||?||'%'", (filename,))
     row = cursor.fetchone()
     assert row is not None
     assert row[1] == size, row
-    assert row[2] == isLocal, row
+    assert row[2] == Local, row
     assert row[4] == server, row
 
 
@@ -99,7 +99,7 @@ class TestS3AgentClass:
         ### GIVEN ###
         with open(f'{FILESYSTEM_PATH}/test_simple_file.txt', 'w') as file:
             file.write('Hello world')
-        assert_entry_state(handle_agent, 'test_simple_file.txt', 0, 1, 'remote')
+        assert_entry_state(handle_agent, 'test_simple_file.txt', 0, 1, '')
 
         ### WHEN ###
         time.sleep(5)
@@ -110,4 +110,5 @@ class TestS3AgentClass:
 
         with open(f'{FILESYSTEM_PATH}/test_simple_file.txt') as file:
             assert file.readlines()[0] == 'Hello world'
-        assert_entry_state(handle_agent, 'test_simple_file.txt', 0, 1, 'remote')
+
+        assert_entry_state(handle_agent, 'test_simple_file.txt', 0, 1, '')

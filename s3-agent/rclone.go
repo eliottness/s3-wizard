@@ -113,7 +113,7 @@ func (r *RClone) Run(args []string) (int, error) {
 	return -1, nil
 }
 
-func (r *RClone) getS3Path(entry *S3NodeTable, rule *S3RuleTable) (string, error) {
+func (r *RClone) getS3Path(entry *S3NodeTable) (string, error) {
 	config, err := LoadConfig(r.config.GetRClonePath())
 
 	if err != nil {
@@ -122,11 +122,12 @@ func (r *RClone) getS3Path(entry *S3NodeTable, rule *S3RuleTable) (string, error
 
 	bucket := config.RCloneConfig[entry.Server]["bucket"]
 
-	return filepath.Join(bucket, "s3-agent", rule.UUID, entry.UUID), err
+	return filepath.Join(bucket, "s3-agent", entry.Rule.UUID, entry.UUID), err
 }
 
-func (r *RClone) Send(entry *S3NodeTable, rule *S3RuleTable) error {
-	s3Path, err := r.getS3Path(entry, rule)
+func (r *RClone) Send(entry *S3NodeTable) error {
+
+	s3Path, err := r.getS3Path(entry)
 
 	if err != nil {
 		return err
@@ -136,8 +137,8 @@ func (r *RClone) Send(entry *S3NodeTable, rule *S3RuleTable) error {
 	return err
 }
 
-func (r *RClone) Download(entry *S3NodeTable, rule *S3RuleTable) error {
-	s3Path, err := r.getS3Path(entry, rule)
+func (r *RClone) Download(entry *S3NodeTable) error {
+	s3Path, err := r.getS3Path(entry)
 
 	if err != nil {
 		return err
@@ -147,8 +148,8 @@ func (r *RClone) Download(entry *S3NodeTable, rule *S3RuleTable) error {
 	return err
 }
 
-func (r *RClone) Remove(entry *S3NodeTable, rule *S3RuleTable) error {
-	s3Path, err := r.getS3Path(entry, rule)
+func (r *RClone) Remove(entry *S3NodeTable) error {
+	s3Path, err := r.getS3Path(entry)
 
 	if err != nil {
 		return err

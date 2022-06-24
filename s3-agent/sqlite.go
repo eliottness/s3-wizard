@@ -10,11 +10,13 @@ import (
 
 /// The database table for the file entries
 type S3NodeTable struct {
-	Path    string `gorm:"primaryKey"`
-	Size    int64
-	IsLocal bool
-	UUID    string
-	Server  string
+	Path     string `gorm:"primaryKey"`
+	Size     int64
+	Local    bool
+	UUID     string
+	Server   string
+	Rulepath string
+	Rule     S3RuleTable `gorm:"foreignKey:Rulepath"`
 }
 
 /// Needed to link the local loopback filesystem
@@ -45,36 +47,37 @@ func Open(config *ConfigPath) *gorm.DB {
 /// Returns a file entry from the database
 func GetEntry(db *gorm.DB, path string) *S3NodeTable {
 	entry := S3NodeTable{
-		Path:    path,
-		Size:    0,
-		IsLocal: true,
-		UUID:    uuid.New().String(),
-		Server:  "",
+		Path:   path,
+		Size:   0,
+		Local:  true,
+		UUID:   uuid.New().String(),
+		Server: "",
 	}
 	db.Where("Path = ?", path).FirstOrCreate(&entry)
 	return &entry
 }
 
 /// Adds a file entry to the database
-func NewEntry(path string, size int64) *S3NodeTable {
+func NewEntry(rulePath, path string, size int64) *S3NodeTable {
 	return &S3NodeTable{
-		Path:    path,
-		Size:    size,
-		IsLocal: true,
-		UUID:    uuid.New().String(),
-		Server:  "",
+		Path:     path,
+		Size:     size,
+		Local:    true,
+		UUID:     uuid.New().String(),
+		Server:   "",
+		Rulepath: rulePath,
 	}
 }
 
 /// Tell the DB that the file is remote now
 func SendToServer(db *gorm.DB, entry *S3NodeTable, server string) {
-	db.Model(entry).Where("Path = ?", entry.Path).Update("Server", server).Update("IsLocal", false)
+	db.Model(entry).Where("Path = ?", entry.Path).Update("Server", server).Update("Local", false)
 }
 
 func IsEntryLocal(db *gorm.DB, path string) bool {
 	var entry []S3NodeTable
 	db.Where("Path = ?", path).Limit(1).Find(&entry)
-	return len(entry) == 0 || entry[0].IsLocal
+	return len(entry) == 0 || entry[0].Local
 }
 
 /// Remove file entry from the database
@@ -88,7 +91,7 @@ func RenameEntry(db *gorm.DB, oldPath, newPath string) {
 
 /// Tell the DB that the file is local now
 func RetriveFromServer(db *gorm.DB, entry *S3NodeTable) {
-	db.Model(entry).Where("Path = ?", entry.Path).Update("Server", "").Update("IsLocal", true)
+	db.Model(entry).Where("Path = ?", entry.Path).Update("Server", "").Update("Local", true)
 }
 
 func GetRule(db *gorm.DB, path string) *S3RuleTable {
