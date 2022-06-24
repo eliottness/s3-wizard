@@ -24,7 +24,7 @@ def run_command(cmd, stdout=None, stderr=None, code=None):
 def assert_rclone_file(cursor, filename):
     s3_file_path = os.path.join(get_rule_entry(cursor)[1], filename)
     rclone_config_path = os.path.join(S3_AGENT_PATH, 'rclone.conf.tmp')
-    cmd = f'sudo ./rclone --config {rclone_config_path} lsf remote:bucket-test/{s3_file_path}'
+    cmd = f'./rclone --config {rclone_config_path} lsf remote:bucket-test/{s3_file_path}'
     run_command(cmd, stdout=filename, stderr='', code=0)
 
 
@@ -61,12 +61,11 @@ def handle_server():
 @pytest.fixture(scope='function')
 def handle_agent(request):
     ### SETUP ###
-    # Todo: find a way to not have to fully reset env, then delete those lines
+    # Reset env
     run_command(f'rm -rf {S3_AGENT_PATH}', code=0)
-    run_command(f'./s3-agent config import {request.param}', code=0)
 
-    # Run s3-agent in sync mode
-    # Todo: Pass config through CLI option once it works
+    # Set config then run s3-agent in sync mode
+    run_command(f'./s3-agent config import {request.param}', code=0)
     process = subprocess.Popen('./s3-agent sync'.split(' '))
 
     # Wait for our the filesystem to be ready
