@@ -95,7 +95,7 @@ class TestS3AgentClass:
         assert_entry_state(handle_agent, 'test_simple_file.txt', 0, 1, '')
 
         ### WHEN ###
-        time.sleep(5)
+        time.sleep(10)
 
         ### THEN ###
         assert_rclone_file(handle_agent, 'test_simple_file.txt')

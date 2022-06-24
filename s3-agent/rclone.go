@@ -6,6 +6,7 @@ import "C"
 import (
 	_ "embed"
 	"log"
+	"path"
 	"path/filepath"
 	"syscall"
 	"unsafe"
@@ -135,15 +136,14 @@ func (r *RClone) Send(entry *S3NodeTable) error {
 }
 
 func (r *RClone) Download(entry *S3NodeTable) error {
-	_, err := r.getS3Path(entry)
+	s3Path, err := r.getS3Path(entry)
 
 	if err != nil {
 		return err
 	}
 
-	return nil
-	// _, err = r.Run([]string{"./rclone", "move", entry.Server + ":" + s3Path, entry.Path})
-	// return err
+	_, err = r.Run([]string{"./rclone", "move", entry.Server + ":" + s3Path + "/" + filepath.Base(entry.Path), path.Dir(entry.Path)})
+	return err
 }
 
 func (r *RClone) Remove(entry *S3NodeTable) error {
