@@ -48,9 +48,13 @@ func (s *S3Sender) Cycle() {
 
 	db := Open(s.config)
 	var entries []S3NodeTable
-	db.Model(&S3NodeTable{}).Where("Local = ?", true).Where("Rulepath = ?", s.rule.Src).Find(&entries)
+	db.Model(&S3NodeTable{}).Where("Local = ?", true).Preload("S3RuleTable").Find(&entries)
 
 	for _, entry := range entries {
+		if entry.S3RuleTablePath != s.rule.Src {
+			continue
+		}
+
 		if s.isPatternExcluded(entry.Path) {
 			continue
 		}

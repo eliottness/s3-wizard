@@ -206,7 +206,7 @@ func (fs *S3FS) Download(path string) error {
 	}
 
 	db := Open(fs.config)
-	entry := GetEntry(db, path)
+	entry := GetEntry(db, fs.mountPath, path)
 
 	// The file does not need to be tracked or the file is local
 	if entry == nil || entry.Local {
@@ -254,7 +254,7 @@ func (fs *S3FS) GetSize(path string) (int64, error) {
 	}
 
 	db := Open(fs.config)
-	entry := GetEntry(db, path)
+	entry := GetEntry(db, fs.mountPath, path)
 
 	// The file does not need to be tracked or the file is local
 	if entry == nil || entry.Local {
