@@ -11,7 +11,9 @@ import sqlite3
 
 NB_TRY = 5
 FILESYSTEM_PATH = './tmp'
-S3_AGENT_PATH = os.path.join(os.path.expanduser('~'), '.s3-agent')
+LOCAL_AGENT_PATH = os.path.join(os.path.expanduser('~'), '.s3-agent')
+CI_AGENT_PATH = os.path.join(os.path.expanduser('~'), '.config', '.s3-agent')
+S3_AGENT_PATH = CI_AGENT_PATH if os.environ.get('CI') is not None else LOCAL_AGENT_PATH
 
 
 def run_command(cmd, stdout=None, stderr=None, code=None):
@@ -70,7 +72,6 @@ def handle_agent(request):
     assert os.path.exists(FILESYSTEM_PATH), 'FS could not be mounted by s3-agent'
 
     # Connect to our local db
-    assert os.path.exists(os.path.join(S3_AGENT_PATH))
     connection = sqlite3.connect(os.path.join(S3_AGENT_PATH, 'sqlite.db'))
 
     yield connection.cursor()
@@ -79,7 +80,6 @@ def handle_agent(request):
     connection.close()
     process.send_signal(subprocess.signal.SIGTERM)
     process.wait()
-    run_command(f'test -e {FILESYSTEM_PATH}', code=1)
 
 
 ######################## TESTS ########################
