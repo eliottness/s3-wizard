@@ -46,8 +46,9 @@ func (r *RClone) getS3Path(entry *S3NodeTable) (string, error) {
 	}
 
 	bucket := config.RCloneConfig[entry.Server]["bucket"]
+	serverPath := filepath.Join(bucket, "s3-agent", entry.S3RuleTable.UUID, entry.UUID)
 
-	return filepath.Join(bucket, "s3-agent", entry.Rule.UUID, entry.UUID), err
+	return entry.Server + ":" + serverPath, nil
 }
 
 func (r *RClone) Send(entry *S3NodeTable) error {
@@ -57,7 +58,7 @@ func (r *RClone) Send(entry *S3NodeTable) error {
 		return err
 	}
 
-	ret, err := r.Run(subprocess.Args("copy", entry.Path, entry.Server+":"+s3Path))
+	ret, err := r.Run(subprocess.Args("copyto", entry.Path, s3Path))
 	if ret != 0 {
 		log.Println("Rclone send failed with exit code: ", ret)
 	}
@@ -71,7 +72,7 @@ func (r *RClone) Download(entry *S3NodeTable) error {
 		return err
 	}
 
-	ret, err := r.Run(subprocess.Args("move", entry.Server+":"+s3Path+"/"+filepath.Base(entry.Path), path.Dir(entry.Path)))
+	ret, err := r.Run(subprocess.Args("move", s3Path, entry.Path))
 	if ret != 0 {
 		log.Println("Rclone download failed with exit code: ", ret)
 	}
@@ -85,7 +86,7 @@ func (r *RClone) Remove(entry *S3NodeTable) error {
 		return err
 	}
 
-	ret, err := r.Run(subprocess.Args("deletefile", entry.Server+":"+s3Path))
+	ret, err := r.Run(subprocess.Args("deletefile", s3Path))
 	if ret != 0 {
 		log.Println("Rclone remove failed with exit code: ", ret)
 	}

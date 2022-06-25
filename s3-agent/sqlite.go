@@ -10,13 +10,13 @@ import (
 
 /// The database table for the file entries
 type S3NodeTable struct {
-	Path     string `gorm:"primaryKey"`
-	Size     int64
-	Local    bool
-	UUID     string
-	Server   string
-	Rulepath string
-	Rule     S3RuleTable `gorm:"foreignKey:Rulepath"`
+	Path            string `gorm:"primaryKey"`
+	Size            int64
+	Local           bool
+	UUID            string
+	Server          string
+	S3RuleTablePath string
+	S3RuleTable     S3RuleTable
 }
 
 /// Needed to link the local loopback filesystem
@@ -60,12 +60,12 @@ func GetEntry(db *gorm.DB, path string) *S3NodeTable {
 /// Adds a file entry to the database
 func NewEntry(rulePath, path string, size int64) *S3NodeTable {
 	return &S3NodeTable{
-		Path:     path,
-		Size:     size,
-		Local:    true,
-		UUID:     uuid.New().String(),
-		Server:   "",
-		Rulepath: rulePath,
+		Path:            path,
+		Size:            size,
+		Local:           true,
+		UUID:            uuid.New().String(),
+		Server:          "",
+		S3RuleTablePath: rulePath,
 	}
 }
 
