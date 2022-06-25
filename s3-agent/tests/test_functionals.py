@@ -95,13 +95,32 @@ class TestS3AgentClass:
         assert_entry_state(handle_agent, 'test_simple_file.txt', 0, 1, '')
 
         ### WHEN ###
-        time.sleep(10)
+        time.sleep(5)
 
         ### THEN ###
         assert_rclone_file(handle_agent, 'test_simple_file.txt')
-        assert_entry_state(handle_agent, 'test_simple_file.txt', 0, 0, 'remote')
+        assert_entry_state(handle_agent, 'test_simple_file.txt', 11, 0, 'remote')
 
         with open(f'{FILESYSTEM_PATH}/test_simple_file.txt') as file:
             assert file.readlines()[0] == 'Hello world'
 
+        assert_entry_state(handle_agent, 'test_simple_file.txt', 11, 1, '')
+
+    def test_simple_folder(self, handle_agent):
+        ### GIVEN ###
+        os.mkdir(f'{FILESYSTEM_PATH}/test_simple_folder')
+        with open(f'{FILESYSTEM_PATH}/test_simple_folder/test_simple_file.txt', 'w') as file:
+            file.write('Hello world')
         assert_entry_state(handle_agent, 'test_simple_file.txt', 0, 1, '')
+
+        ### WHEN ###
+        time.sleep(5)
+
+        ### THEN ###
+        assert_rclone_file(handle_agent, 'test_simple_file.txt')
+        assert_entry_state(handle_agent, 'test_simple_file.txt', 11, 0, 'remote')
+
+        with open(f'{FILESYSTEM_PATH}/test_simple_folder/test_simple_file.txt') as file:
+            assert file.readlines()[0] == 'Hello world'
+
+        assert_entry_state(handle_agent, 'test_simple_file.txt', 11, 1, '')
