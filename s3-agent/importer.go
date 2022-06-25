@@ -18,6 +18,8 @@ type customWalkFunc func(path string, info fs.FileInfo) error
 // Must return a rule.Src path empty
 func importFS(rule Rule, config *ConfigPath) error {
 
+    log.Printf("Content detected at path %v. Starting import process ...", rule.Src)
+
 	if _, err := os.Stat(rule.Src); os.IsNotExist(err) {
 		return nil // Nothing to import
 	}
@@ -29,16 +31,20 @@ func importFS(rule Rule, config *ConfigPath) error {
 		return err
 	}
 
+    log.Println("Import process: Creating folders ...")
+
 	// Creates all folders
-	err = customWalkDir(rule.Src, func(oldPath string, info os.FileInfo) error {
+	if err := createDirectories(rule.Src, func(oldPath string, info os.FileInfo) error {
 		newPath := filepath.Join(loopbackRoot, oldPath[len(rule.Src):])
 		return os.Mkdir(newPath, info.Mode())
-	})
-	if err != nil {
+	}); err != nil {
 		return err
 	}
 
-	return customWalkFile(rule.Src,
+    log.Println("Import process: Copying files ...")
+
+
+	if err := customWalkFile(rule.Src,
 		func(oldPath string, info os.FileInfo) error {
 			newPath := filepath.Join(loopbackRoot, oldPath[len(rule.Src):])
 
@@ -52,7 +58,7 @@ func importFS(rule Rule, config *ConfigPath) error {
 				if err != nil {
 					return err
 				}
-				pointedNewPath := filepath.Join(loopbackRoot, pointedOldPath[len(rule.Src):])
+				pointedNewPath := filepath.Join(loopbackRoot, pointedOldPath[len(rule.Src) - 1:])
 				return os.Symlink(pointedNewPath, newPath)
 			}
 
@@ -60,11 +66,20 @@ func importFS(rule Rule, config *ConfigPath) error {
 			os.Rename(oldPath, newPath)
 			return nil
 		},
-	)
+	); err != nil {
+        return err
+    }
+
+    log.Println("Import process: Deleting folders ...")
+
+    // We delete all folders. If files are still detected, we let the users handle them.
+	return createDirectories(rule.Src, func(oldPath string, info os.FileInfo) error {
+		return os.Remove(oldPath)
+	})
 }
 
 /// Walk only folders
-func customWalkDir(dirPath string, walkFunc customWalkFunc) error {
+func createDirectories(dirPath string, walkFunc customWalkFunc) error {
 
 	nodes, err := ioutil.ReadDir(dirPath)
 	if err != nil {
@@ -76,13 +91,37 @@ func customWalkDir(dirPath string, walkFunc customWalkFunc) error {
 		if !node.Mode().IsDir() {
 			continue
 		}
-		if err := walkFunc(nodePath, node); err != nil {
+		if err := os.Create(nodePath); err != nil {
 			return err
 		}
-		if err := customWalkDir(nodePath, walkFunc); err != nil {
+		if err := createDirectories(nodePath, walkFunc); err != nil {
 			return err
 		}
 
+	}
+	return nil
+}
+
+func DeleteDirectories(dirPath string) error {
+
+	nodes, err := ioutil.ReadDir(dirPath)
+	if err != nil {
+		return err
+	}
+
+	for _, node := range nodes {
+		nodePath := filepath.Join(dirPath, node.Name())
+		if !node.Mode().IsDir() {
+			continue
+		}
+
+		if err := DeleteDirectories(nodePath); err != nil {
+			return err
+		}
+
+        if err := os.Remove(nodePath); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -106,6 +145,7 @@ func customWalkFile(dirPath string, walkFunc customWalkFunc) error {
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -116,23 +156,28 @@ func importFile(oldPath, newPath string, info os.FileInfo, rule Rule, db *gorm.D
 	var entry *S3NodeTable
 	db.Model(&entry).Where("Path = ?", oldPath).Find(&entries)
 
-	if rule.MustBeRemote(oldPath) {
+    // Update the DB with the new entry
+    if len(entries) == 0 {
+        entry = NewEntry(rule.Src, newPath, info.Size())
+        db.Model(&entry).Create(entry)
+    } else {
+        entry = &entries[0]
+        db.Model(&entry).Where("Path = ?", oldPath).Update("Path", entry.Path)
+    }
+
+    if rule.MustBeRemote(oldPath) {
+
 		entry := GetEntry(db, rule.Src, oldPath)
+        SendToServer(db, entry, rule.Dest, info.Size())
 		rclone.Send(entry)
 
 		if err := syscall.Truncate(entry.Path, 0); err != nil {
 			log.Println("Error truncating the file locally", err)
 		}
-	}
-
-	// Update the DB with the new entry
-	if len(entries) == 0 {
-		entry = NewEntry(rule.Src, newPath, info.Size())
-		db.Model(&entry).Create(entry)
+        log.Printf("Imported file: %v -> %v", rule.Dest, oldPath)
 	} else {
-		entry = &entries[0]
-		db.Model(&entry).Where("Path = ?", oldPath).Update("Path", entry.Path)
-	}
+        log.Println("Imported file: local ->", oldPath)
+    }
 
 	return os.Rename(oldPath, newPath)
 }
