@@ -1,5 +1,6 @@
 from importlib.resources import path
 import os
+
 import pytest
 import subprocess
 import time
@@ -23,21 +24,32 @@ def run_command(cmd, stdout=None, stderr=None, code=None):
     assert True if stderr is None else process.stderr.decode() == stderr, process.stderr.decode()
 
 
+def get_rule_entry(cursor):
+    cursor.execute("SELECT * FROM s3_rule_tables")
+    return cursor.fetchone()
+
+
+def get_node_entry(cursor, filename):
+    path = os.path.join(S3_AGENT_PATH, get_rule_entry(cursor)[0], filename)
+    cursor.execute(f"SELECT * FROM s3_node_tables WHERE path = '{path}'")
+    return cursor.fetchone()
+
+
 def assert_rclone_file(cursor, filename):
-    cursor.execute("SELECT * FROM s3_node_tables WHERE path LIKE '%'||?||'%'", (filename,))
-    s3_file_path = os.path.join(cursor.fetchone()[3], filename)
+    rule_entry = get_rule_entry(cursor)
+    node_entry = get_node_entry(cursor, filename)
+    s3_file_path = os.path.join("remote:bucket-test/s3-agent", rule_entry[0], node_entry[3])
     rclone_config_path = os.path.join(S3_AGENT_PATH, 'rclone.conf.tmp')
-    cmd = f'./rclone --config {rclone_config_path} lsf remote:bucket-test/s3-agent/{s3_file_path}'
-    run_command(cmd, stdout=filename + '\n', stderr='', code=0)
+    cmd = f'./rclone --config {rclone_config_path} lsf {s3_file_path}'
+    run_command(cmd, stdout=node_entry[3] + '\n', stderr='', code=0)
 
 
 def assert_entry_state(cursor, filename, size, Local, server):
-    cursor.execute("SELECT * FROM s3_node_tables WHERE path LIKE '%'||?||'%'", (filename,))
-    row = cursor.fetchone()
-    assert row is not None
-    assert row[1] == size, row
-    assert row[2] == Local, row
-    assert row[4] == server, row
+    entry = get_node_entry(cursor, filename)
+    assert entry is not None
+    assert entry[1] == size, entry
+    assert entry[2] == Local, entry
+    assert entry[4] == server, entry
 
 
 ####################### FIXTURES ######################
@@ -93,6 +105,7 @@ class TestS3AgentClass:
         ### GIVEN ###
         with open(f'{FILESYSTEM_PATH}/test_simple_file.txt', 'w') as file:
             file.write('Hello world')
+
         assert_entry_state(handle_agent, 'test_simple_file.txt', 0, 1, '')
 
         ### WHEN ###
@@ -110,40 +123,46 @@ class TestS3AgentClass:
     def test_simple_folder(self, handle_agent):
         ### GIVEN ###
         os.mkdir(f'{FILESYSTEM_PATH}/test_simple_folder')
-        with open(f'{FILESYSTEM_PATH}/test_simple_folder/test_simple_file.txt', 'w') as file:
+        file_path = 'test_simple_folder/test_simple_file.txt'
+
+        with open(f'{FILESYSTEM_PATH}/{file_path}', 'w') as file:
             file.write('Hello world')
-        assert_entry_state(handle_agent, 'test_simple_file.txt', 0, 1, '')
+
+        assert_entry_state(handle_agent, file_path, 0, 1, '')
 
         ### WHEN ###
         time.sleep(5)
 
         ### THEN ###
-        assert_rclone_file(handle_agent, 'test_simple_file.txt')
-        assert_entry_state(handle_agent, 'test_simple_file.txt', 11, 0, 'remote')
+        assert_rclone_file(handle_agent, file_path)
+        assert_entry_state(handle_agent, file_path, 11, 0, 'remote')
 
-        with open(f'{FILESYSTEM_PATH}/test_simple_folder/test_simple_file.txt') as file:
+        with open(f'{FILESYSTEM_PATH}/{file_path}') as file:
             assert file.readlines()[0] == 'Hello world'
 
-        assert_entry_state(handle_agent, 'test_simple_file.txt', 11, 1, '')
+        assert_entry_state(handle_agent, file_path, 11, 1, '')
 
     def test_subfolder(self, handle_agent):
         ### GIVEN ###
         os.makedirs(f'{FILESYSTEM_PATH}/folder/subfolder')
-        with open(f'{FILESYSTEM_PATH}/folder/subfolder/test_simple_file.txt', 'w') as file:
+        file_path = 'folder/subfolder/test_simple_file.txt'
+
+        with open(f'{FILESYSTEM_PATH}/{file_path}', 'w') as file:
             file.write('Hello world')
-        assert_entry_state(handle_agent, 'test_simple_file.txt', 0, 1, '')
+
+        assert_entry_state(handle_agent, file_path, 0, 1, '')
 
         ### WHEN ###
         time.sleep(5)
 
         ### THEN ###
-        assert_rclone_file(handle_agent, 'test_simple_file.txt')
-        assert_entry_state(handle_agent, 'test_simple_file.txt', 11, 0, 'remote')
+        assert_rclone_file(handle_agent, file_path)
+        assert_entry_state(handle_agent, file_path, 11, 0, 'remote')
 
-        with open(f'{FILESYSTEM_PATH}/folder/subfolder/test_simple_file.txt') as file:
+        with open(f'{FILESYSTEM_PATH}/{file_path}') as file:
             assert file.readlines()[0] == 'Hello world'
 
-        assert_entry_state(handle_agent, 'test_simple_file.txt', 11, 1, '')
+        assert_entry_state(handle_agent, file_path, 11, 1, '')
 
     def test_same_name_files(self, handle_agent):
         ### GIVEN ###

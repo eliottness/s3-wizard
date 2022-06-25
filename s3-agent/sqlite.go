@@ -45,15 +45,16 @@ func Open(config *ConfigPath) *gorm.DB {
 }
 
 /// Returns a file entry from the database
-func GetEntry(db *gorm.DB, path string) *S3NodeTable {
+func GetEntry(db *gorm.DB, rulePath, path string) *S3NodeTable {
 	entry := S3NodeTable{
-		Path:   path,
-		Size:   0,
-		Local:  true,
-		UUID:   uuid.New().String(),
-		Server: "",
+		Path:            path,
+		Size:            0,
+		Local:           true,
+		UUID:            uuid.New().String(),
+		Server:          "",
+		S3RuleTablePath: rulePath,
 	}
-	db.Where("Path = ?", path).FirstOrCreate(&entry)
+	db.Where("Path = ?", path).Preload("S3RuleTable").FirstOrCreate(&entry)
 	return &entry
 }
 

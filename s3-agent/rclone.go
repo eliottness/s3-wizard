@@ -6,7 +6,6 @@ import "C"
 import (
 	_ "embed"
 	"log"
-	"path"
 	"path/filepath"
 
 	"github.com/estebangarcia21/subprocess"
@@ -29,7 +28,6 @@ func NewRClone(config *ConfigPath) (*RClone, error) {
 func (r *RClone) Run(opts ...subprocess.Option) (int, error) {
 
 	opts = append(opts, subprocess.Args("--config", r.config.GetRClonePath()))
-
 	pop := subprocess.New("./rclone", opts...)
 
 	if err := pop.Exec(); err != nil {
@@ -72,7 +70,7 @@ func (r *RClone) Download(entry *S3NodeTable) error {
 		return err
 	}
 
-	ret, err := r.Run(subprocess.Args("move", s3Path, entry.Path))
+	ret, err := r.Run(subprocess.Args("moveto", s3Path, entry.Path))
 	if ret != 0 {
 		log.Println("Rclone download failed with exit code: ", ret)
 	}
