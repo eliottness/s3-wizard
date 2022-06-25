@@ -43,13 +43,13 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 	dbEntry := AddIfNotExistsRule(db, rule.Src)
 	loopback := ctx.ConfigPath.GetLoopbackFSPath(dbEntry.UUID)
 
-	if _, err := os.Stat(rule.Src); os.IsExist(err) {
+	if _, err := os.Stat(rule.Src); err == nil {
 
 		if err := importFS(rule, ctx.ConfigPath); err != nil {
 			return err
 		}
 
-		if _, err := os.Stat(rule.Src); os.IsExist(err) {
+		if _, err := os.Stat(rule.Src); err == nil {
 			log.Println("Cannot mount destination: file exists: ", rule.Src)
 		}
 	}
