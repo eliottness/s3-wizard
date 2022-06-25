@@ -70,6 +70,7 @@ def handle_agent(request):
     assert os.path.exists(FILESYSTEM_PATH), 'FS could not be mounted by s3-agent'
 
     # Connect to our local db
+    assert os.path.exists(os.path.join(S3_AGENT_PATH, 'sqlite.db'))
     connection = sqlite3.connect(os.path.join(S3_AGENT_PATH, 'sqlite.db'))
 
     yield connection.cursor()

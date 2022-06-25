@@ -28,15 +28,15 @@ func NewRClone(config *ConfigPath) (*RClone, error) {
 /// This file descriptor is passed to execvp with the arguments to run rclone
 func (r *RClone) Run(opts ...subprocess.Option) (int, error) {
 
-    opts = append(opts, subprocess.Args("--config", r.config.GetRClonePath()))
+	opts = append(opts, subprocess.Args("--config", r.config.GetRClonePath()))
 
-    pop := subprocess.New("./rclone", opts...)
+	pop := subprocess.New("./rclone", opts...)
 
-    if err := pop.Exec(); err != nil {
-        return -1, err
-    }
+	if err := pop.Exec(); err != nil {
+		return -1, err
+	}
 
-    return pop.ExitCode(), nil
+	return pop.ExitCode(), nil
 }
 
 func (r *RClone) getS3Path(entry *S3NodeTable) (string, error) {
@@ -57,10 +57,10 @@ func (r *RClone) Send(entry *S3NodeTable) error {
 		return err
 	}
 
-	ret, err := r.Run(subprocess.Args("copy", entry.Path, entry.Server + ":" + s3Path))
-    if ret != 0 {
-        log.Println("Rclone send failed with exit code: ", ret)
-    }
+	ret, err := r.Run(subprocess.Args("copy", entry.Path, entry.Server+":"+s3Path))
+	if ret != 0 {
+		log.Println("Rclone send failed with exit code: ", ret)
+	}
 	return err
 }
 
@@ -71,10 +71,10 @@ func (r *RClone) Download(entry *S3NodeTable) error {
 		return err
 	}
 
-	ret, err := r.Run(subprocess.Args("move", entry.Server + ":" + s3Path + "/" + filepath.Base(entry.Path), path.Dir(entry.Path)))
-    if ret != 0 {
-        log.Println("Rclone download failed with exit code: ", ret)
-    }
+	ret, err := r.Run(subprocess.Args("move", entry.Server+":"+s3Path+"/"+filepath.Base(entry.Path), path.Dir(entry.Path)))
+	if ret != 0 {
+		log.Println("Rclone download failed with exit code: ", ret)
+	}
 	return err
 }
 
@@ -85,9 +85,9 @@ func (r *RClone) Remove(entry *S3NodeTable) error {
 		return err
 	}
 
-	ret, err := r.Run(subprocess.Args("deletefile", entry.Server + ":" + s3Path))
-    if ret != 0 {
-        log.Println("Rclone remove failed with exit code: ", ret)
-    }
+	ret, err := r.Run(subprocess.Args("deletefile", entry.Server+":"+s3Path))
+	if ret != 0 {
+		log.Println("Rclone remove failed with exit code: ", ret)
+	}
 	return err
 }
