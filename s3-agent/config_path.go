@@ -74,7 +74,7 @@ func (c *ConfigPath) GetDBPath() string {
 	return filepath.Join(c.folder, "sqlite.db")
 }
 
-func (c *ConfigPath) GetRcloneBinaryPath() string {
+func (c *ConfigPath) GetRCloneBinaryPath() string {
 	return filepath.Join(c.folder, "rclone")
 }
 

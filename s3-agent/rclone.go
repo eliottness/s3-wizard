@@ -21,14 +21,15 @@ type RClone struct {
 }
 
 func NewRClone(configPath *ConfigPath) *RClone {
-	rclonePath := configPath.GetRcloneBinaryPath()
-	file, err := os.OpenFile(rclonePath, os.O_TRUNC|os.O_WRONLY, 0700)
+	rclonePath := configPath.GetRCloneBinaryPath()
+	file, err := os.Create(rclonePath)
 	if err != nil {
 		panic(err)
 	}
 
-	defer file.Close()
 	file.Write(rcloneBinary)
+	file.Close()
+	os.Chmod(rclonePath, 0700)
 
 	config, err := LoadConfig(configPath.GetAgentConfigPath())
 	if err != nil {
@@ -46,7 +47,7 @@ func NewRClone(configPath *ConfigPath) *RClone {
 func (r *RClone) Run(opts ...subprocess.Option) (int, error) {
 
 	opts = append(opts, subprocess.Args("--config", r.configPath.GetRCloneConfigPath()))
-	pop := subprocess.New(r.configPath.GetRcloneBinaryPath(), opts...)
+	pop := subprocess.New(r.configPath.GetRCloneBinaryPath(), opts...)
 
 	if err := pop.Exec(); err != nil {
 		return -1, err
