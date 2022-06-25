@@ -32,15 +32,13 @@ type S3FS struct {
 }
 
 func NewS3FS(loopbackPath, mountPath string, config *ConfigPath) *S3FS {
-	rclone, _ := NewRClone(config)
-
 	return &S3FS{
 		loopbackPath: loopbackPath,
 		mountPath:    mountPath,
 		fhmap:        make(map[string][]*S3File),
 		logger:       config.NewLogger("FUSE: " + mountPath + " | "),
 		config:       config,
-		rclone:       rclone,
+		rclone:       NewRClone(config),
 		done:         make(chan bool),
 	}
 }

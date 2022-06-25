@@ -10,7 +10,7 @@ import sqlite3
 ######################## UTILS ########################
 
 
-NB_TRY = 5
+NB_TRY = 3
 FILESYSTEM_PATH = './tmp'
 LOCAL_AGENT_PATH = os.path.join(os.path.expanduser('~'), '.s3-agent')
 CI_AGENT_PATH = os.path.join(os.path.expanduser('~'), '.config', '.s3-agent')
@@ -109,7 +109,7 @@ class TestS3AgentClass:
         assert_entry_state(handle_agent, 'test_simple_file.txt', 0, 1, '')
 
         ### WHEN ###
-        time.sleep(5)
+        time.sleep(3)
 
         ### THEN ###
         assert_rclone_file(handle_agent, 'test_simple_file.txt')
@@ -131,7 +131,7 @@ class TestS3AgentClass:
         assert_entry_state(handle_agent, file_path, 0, 1, '')
 
         ### WHEN ###
-        time.sleep(5)
+        time.sleep(3)
 
         ### THEN ###
         assert_rclone_file(handle_agent, file_path)
@@ -153,7 +153,7 @@ class TestS3AgentClass:
         assert_entry_state(handle_agent, file_path, 0, 1, '')
 
         ### WHEN ###
-        time.sleep(5)
+        time.sleep(3)
 
         ### THEN ###
         assert_rclone_file(handle_agent, file_path)
@@ -173,7 +173,7 @@ class TestS3AgentClass:
             file.write('Hello world 2')
 
         ### WHEN ###
-        time.sleep(5)
+        time.sleep(3)
 
         ### THEN ###
         with open(f'{FILESYSTEM_PATH}/test_simple_folder/test_simple_file.txt') as file:

@@ -6,18 +6,37 @@ import "C"
 import (
 	_ "embed"
 	"log"
+	"os"
 	"path/filepath"
 
 	"github.com/estebangarcia21/subprocess"
 )
 
+//go:embed rclone
+var rcloneBinary []byte
+
 type RClone struct {
-	config *ConfigPath
+	config     *Config
+	configPath *ConfigPath
 }
 
-func NewRClone(config *ConfigPath) (*RClone, error) {
+func NewRClone(configPath *ConfigPath) *RClone {
+	rclonePath := configPath.GetRCloneBinaryPath()
+	file, err := os.Create(rclonePath)
+	if err != nil {
+		panic(err)
+	}
 
-	return &RClone{config: config}, nil
+	file.Write(rcloneBinary)
+	file.Close()
+	os.Chmod(rclonePath, 0700)
+
+	config, err := LoadConfig(configPath.GetAgentConfigPath())
+	if err != nil {
+		panic(err)
+	}
+
+	return &RClone{configPath: configPath, config: config}
 }
 
 /// Run the rclone binary with the given arguments.
@@ -27,8 +46,8 @@ func NewRClone(config *ConfigPath) (*RClone, error) {
 /// This file descriptor is passed to execvp with the arguments to run rclone
 func (r *RClone) Run(opts ...subprocess.Option) (int, error) {
 
-	opts = append(opts, subprocess.Args("--config", r.config.GetRClonePath()))
-	pop := subprocess.New("./rclone", opts...)
+	opts = append(opts, subprocess.Args("--config", r.configPath.GetRCloneConfigPath()))
+	pop := subprocess.New(r.configPath.GetRCloneBinaryPath(), opts...)
 
 	if err := pop.Exec(); err != nil {
 		return -1, err
@@ -38,12 +57,8 @@ func (r *RClone) Run(opts ...subprocess.Option) (int, error) {
 }
 
 func (r *RClone) getS3Path(entry *S3NodeTable) (string, error) {
-	config, err := LoadConfig(r.config.GetAgentConfigPath())
-	if err != nil {
-		return "", err
-	}
 
-	bucket := config.RCloneConfig[entry.Server]["bucket"]
+	bucket := r.config.RCloneConfig[entry.Server]["bucket"]
 	serverPath := filepath.Join(bucket, "s3-agent", entry.S3RuleTable.UUID, entry.UUID)
 
 	return entry.Server + ":" + serverPath, nil

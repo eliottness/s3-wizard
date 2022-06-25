@@ -26,10 +26,7 @@ func importFS(rule Rule, config *ConfigPath) error {
 
 	db := Open(config)
 	loopbackRoot := config.GetLoopbackFSPath(GetRule(db, rule.Src).UUID)
-	rclone, err := NewRClone(config)
-	if err != nil {
-		return err
-	}
+	rclone := NewRClone(config)
 
 	log.Println("Import process: Creating folders ...")
 
