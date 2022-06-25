@@ -43,7 +43,7 @@ def assert_entry_state(cursor, filename, size, Local, server):
 ####################### FIXTURES ######################
 
 
-@pytest.fixture(scope='class')
+@pytest.fixture(scope='function')
 def handle_server():
     ### SETUP ###
     run_command('docker compose -f tests/docker-compose.yml up -d', code=0)
@@ -122,6 +122,25 @@ class TestS3AgentClass:
         assert_entry_state(handle_agent, 'test_simple_file.txt', 11, 0, 'remote')
 
         with open(f'{FILESYSTEM_PATH}/test_simple_folder/test_simple_file.txt') as file:
+            assert file.readlines()[0] == 'Hello world'
+
+        assert_entry_state(handle_agent, 'test_simple_file.txt', 11, 1, '')
+
+    def test_subfolder(self, handle_agent):
+        ### GIVEN ###
+        os.makedirs(f'{FILESYSTEM_PATH}/folder/subfolder')
+        with open(f'{FILESYSTEM_PATH}/folder/subfolder/test_simple_file.txt', 'w') as file:
+            file.write('Hello world')
+        assert_entry_state(handle_agent, 'test_simple_file.txt', 0, 1, '')
+
+        ### WHEN ###
+        time.sleep(5)
+
+        ### THEN ###
+        assert_rclone_file(handle_agent, 'test_simple_file.txt')
+        assert_entry_state(handle_agent, 'test_simple_file.txt', 11, 0, 'remote')
+
+        with open(f'{FILESYSTEM_PATH}/folder/subfolder/test_simple_file.txt') as file:
             assert file.readlines()[0] == 'Hello world'
 
         assert_entry_state(handle_agent, 'test_simple_file.txt', 11, 1, '')
