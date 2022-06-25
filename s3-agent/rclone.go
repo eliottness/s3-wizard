@@ -18,7 +18,7 @@ var rcloneBinary []byte
 type RClone struct {
 	config     *Config
 	configPath *ConfigPath
-    logger     *log.Logger
+	logger     *log.Logger
 }
 
 func NewRClone(configPath *ConfigPath) *RClone {
@@ -65,52 +65,52 @@ func (r *RClone) getS3Path(server, ruleId, entryId string) string {
 	return server + ":" + serverPath
 }
 
-func (r *RClone) Send(fromPath, server string, entry *S3NodeTable) error {
-    if !entry.Local {
-        r.logger.Println("Warning: Asking RClone to send a remote file")
-        return nil
-    }
+func (r *RClone) Send(server string, entry *S3NodeTable) error {
+	if !entry.Local {
+		r.logger.Println("Warning: Asking RClone to send a remote file")
+		return nil
+	}
 
 	s3Path := r.getS3Path(server, entry.S3RuleTable.UUID, entry.UUID)
 
-	ret, err := r.Run(subprocess.Args("copyto", fromPath, s3Path))
+	ret, err := r.Run(subprocess.Args("copyto", entry.Path, s3Path))
 	if ret != 0 {
 		r.logger.Println("Rclone send failed with exit code: ", ret)
-        return err
+		return err
 	}
 
 	return nil
 }
 
 func (r *RClone) Download(entry *S3NodeTable) error {
-    if entry.Local {
-        r.logger.Println("Warning: Asking RClone to download a local file")
-        return nil
-    }
+	if entry.Local {
+		r.logger.Println("Warning: Asking RClone to download a local file")
+		return nil
+	}
 
 	s3Path := r.getS3Path(entry.Server, entry.S3RuleTable.UUID, entry.UUID)
 
 	ret, err := r.Run(subprocess.Args("moveto", s3Path, entry.Path))
 	if ret != 0 {
 		r.logger.Println("Rclone download failed with exit code: ", ret)
-        return err
+		return err
 	}
 
 	return nil
 }
 
 func (r *RClone) Remove(entry *S3NodeTable) error {
-    if entry.Local {
-        r.logger.Println("Warning: Asking RClone to remove a local file")
-        return nil
-    }
+	if entry.Local {
+		r.logger.Println("Warning: Asking RClone to remove a local file")
+		return nil
+	}
 
 	s3Path := r.getS3Path(entry.Server, entry.S3RuleTable.UUID, entry.UUID)
 
 	ret, err := r.Run(subprocess.Args("deletefile", s3Path))
 	if ret != 0 {
 		r.logger.Println("Rclone remove failed with exit code: ", ret)
-        return err
+		return err
 	}
 
 	return nil

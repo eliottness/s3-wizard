@@ -67,10 +67,10 @@ func importFS(rule Rule, config *ConfigPath) error {
 
 	// We delete all folders. If files are still detected, we let the users handle them.
 	if err := deleteDirectories(rule.Src); err != nil {
-        return err
-    }
+		return err
+	}
 
-    return os.Remove(rule.Src)
+	return os.Remove(rule.Src)
 }
 
 /// Walk only folders
@@ -167,16 +167,16 @@ func importFile(oldPath, newPath string, info os.FileInfo, rule Rule, db *gorm.D
 
 	if rule.MustBeRemote(oldPath) {
 
-		if err := rclone.Send(rule.Dest, oldPath, entry); err != nil {
+		if err := rclone.Send(rule.Dest, entry); err != nil {
 			return err
 		}
+
+		SendToServer(db, entry, rule.Dest, info.Size())
 
 		if err := syscall.Truncate(oldPath, 0); err != nil {
 			log.Println("Error truncating the file locally", err)
 			return err
 		}
-
-		SendToServer(db, entry, rule.Dest, info.Size())
 
 		dest = rule.Dest
 	}

@@ -10,7 +10,7 @@ import sqlite3
 ######################## UTILS ########################
 
 
-NB_TRY = 3
+NB_TRY = 10
 FILESYSTEM_PATH = './tmp'
 S3_AGENT_PATH = "./config"
 
@@ -28,7 +28,8 @@ def get_rule_entry(cursor):
 
 
 def get_node_entry(cursor, filename):
-    path = os.path.join(S3_AGENT_PATH, get_rule_entry(cursor)[0], filename)
+    path = os.path.join(S3_AGENT_PATH[2:], get_rule_entry(cursor)[0], filename)
+    print(path)
     cursor.execute(f"SELECT * FROM s3_node_tables WHERE path = '{path}'")
     return cursor.fetchone()
 
@@ -53,7 +54,7 @@ def assert_entry_state(cursor, filename, size, Local, server):
 ####################### FIXTURES ######################
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope='class')
 def handle_server():
     ### SETUP ###
     run_command('docker compose -f tests/docker-compose.yml up -d', code=0)
@@ -108,7 +109,7 @@ class TestS3AgentClass:
         assert_entry_state(handle_agent, 'test_simple_file.txt', 0, 1, '')
 
         ### WHEN ###
-        time.sleep(3)
+        time.sleep(2)
 
         ### THEN ###
         assert_rclone_file(handle_agent, 'test_simple_file.txt')
@@ -130,7 +131,7 @@ class TestS3AgentClass:
         assert_entry_state(handle_agent, file_path, 0, 1, '')
 
         ### WHEN ###
-        time.sleep(3)
+        time.sleep(2)
 
         ### THEN ###
         assert_rclone_file(handle_agent, file_path)
@@ -152,7 +153,7 @@ class TestS3AgentClass:
         assert_entry_state(handle_agent, file_path, 0, 1, '')
 
         ### WHEN ###
-        time.sleep(3)
+        time.sleep(2)
 
         ### THEN ###
         assert_rclone_file(handle_agent, file_path)
@@ -172,7 +173,7 @@ class TestS3AgentClass:
             file.write('Hello world 2')
 
         ### WHEN ###
-        time.sleep(3)
+        time.sleep(2)
 
         ### THEN ###
         with open(f'{FILESYSTEM_PATH}/test_simple_folder/test_simple_file.txt') as file:
