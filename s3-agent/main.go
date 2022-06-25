@@ -26,8 +26,6 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 
 	doSelfUpdate()
 
-	DBSanitize(ctx.ConfigPath)
-
 	config, err := LoadConfig(ctx.ConfigPath.GetAgentConfigPath())
 	if err != nil {
 		log.Println("Cannot load config", err)
@@ -39,8 +37,8 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 	}
 
 	rule := config.Rules[0]
-	db := Open(ctx.ConfigPath)
-	dbEntry := AddIfNotExistsRule(db, rule.Src)
+    orm := NewSQlite(ctx.ConfigPath)
+	dbEntry := orm.AddIfNotExistsRule(rule.Src)
 	loopback := ctx.ConfigPath.GetLoopbackFSPath(dbEntry.UUID)
 
 	if _, err := os.Stat(rule.Src); err == nil {

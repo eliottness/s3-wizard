@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 
 	"github.com/google/uuid"
@@ -26,26 +27,32 @@ type S3RuleTable struct {
 	Path string `gorm:"primaryKey"`
 }
 
-/// Migrate at start up
-func DBSanitize(config *ConfigPath) {
-	db := Open(config)
-	db.AutoMigrate(&S3NodeTable{})
-	db.AutoMigrate(&S3RuleTable{})
-	os.Chmod(config.GetDBPath(), 0600)
+type SQlite struct {
+    db      *gorm.DB
+    logger  *log.Logger
+    config  *ConfigPath
 }
 
-/// Open a connection with the database
-func Open(config *ConfigPath) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(config.GetDBPath()), &gorm.Config{})
+func NewSQlite(config *ConfigPath) *SQlite {
+
+    db, err := gorm.Open(sqlite.Open(config.GetDBPath()), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
 
-	return db
+	db.AutoMigrate(&S3NodeTable{})
+	db.AutoMigrate(&S3RuleTable{})
+	os.Chmod(config.GetDBPath(), 0600)
+
+    return &SQlite{
+        db:      db,
+        logger:  config.NewLogger("SQLITE: "),
+        config:  config,
+    }
 }
 
 /// Returns a file entry from the database
-func GetEntry(db *gorm.DB, rulePath, path string) *S3NodeTable {
+func (orm *SQlite) GetEntry(rulePath, path string) *S3NodeTable {
 	entry := S3NodeTable{
 		Path:            path,
 		Size:            0,
@@ -54,13 +61,13 @@ func GetEntry(db *gorm.DB, rulePath, path string) *S3NodeTable {
 		Server:          "",
 		S3RuleTablePath: rulePath,
 	}
-	db.Where("Path = ?", path).Preload("S3RuleTable").FirstOrCreate(&entry)
+	orm.db.Where("Path = ?", path).Preload("S3RuleTable").FirstOrCreate(&entry)
 	return &entry
 }
 
 /// Adds a file entry to the database
-func NewEntry(rulePath, path string, size int64) *S3NodeTable {
-	return &S3NodeTable{
+func (orm *SQlite) NewEntry(rulePath, path string, size int64) *S3NodeTable {
+	entry := &S3NodeTable{
 		Path:            path,
 		Size:            size,
 		Local:           true,
@@ -68,44 +75,47 @@ func NewEntry(rulePath, path string, size int64) *S3NodeTable {
 		Server:          "",
 		S3RuleTablePath: rulePath,
 	}
+
+    orm.db.Create(entry)
+    return entry
 }
 
 /// Tell the DB that the file is remote now
-func SendToServer(db *gorm.DB, entry *S3NodeTable, server string, size int64) {
-	db.Model(entry).Where("Path = ?", entry.Path).Update("Server", server).Update("Local", false).Update("Size", size)
+func (orm *SQlite) SendToServer(entry *S3NodeTable, server string, size int64) {
+	orm.db.Model(entry).Where("Path = ?", entry.Path).Update("Server", server).Update("Local", false).Update("Size", size)
 }
 
-func IsEntryLocal(db *gorm.DB, path string) bool {
+func (orm *SQlite) IsEntryLocal(path string) bool {
 	var entry []S3NodeTable
-	db.Where("Path = ?", path).Limit(1).Find(&entry)
+	orm.db.Where("Path = ?", path).Limit(1).Find(&entry)
 	return len(entry) == 0 || entry[0].Local
 }
 
 /// Remove file entry from the database
-func DeleteEntry(db *gorm.DB, entry *S3NodeTable) {
-	db.Delete(entry.Path)
+func (orm *SQlite) DeleteEntry(entry *S3NodeTable) {
+	orm.db.Delete(entry.Path)
 }
 
-func RenameEntry(db *gorm.DB, oldPath, newPath string) {
-	db.Model(&S3NodeTable{}).Where("Path = ?", oldPath).Update("Path", newPath)
+func (orm *SQlite) RenameEntry(oldPath, newPath string) {
+	orm.db.Model(&S3NodeTable{}).Where("Path = ?", oldPath).Update("Path", newPath)
 }
 
 /// Tell the DB that the file is local now
-func RetriveFromServer(db *gorm.DB, entry *S3NodeTable) {
-	db.Model(entry).Where("Path = ?", entry.Path).Update("Server", "").Update("Local", true)
+func (orm *SQlite) RetriveFromServer(entry *S3NodeTable) {
+	orm.db.Model(entry).Where("Path = ?", entry.Path).Update("Server", "").Update("Local", true)
 }
 
-func GetRule(db *gorm.DB, path string) *S3RuleTable {
+func (orm *SQlite) GetRule(path string) *S3RuleTable {
 	var rule S3RuleTable
-	db.Where("Path = ?", path).First(&rule)
+	orm.db.Where("Path = ?", path).First(&rule)
 	return &rule
 }
 
-func AddIfNotExistsRule(db *gorm.DB, path string) *S3RuleTable {
+func (orm *SQlite) AddIfNotExistsRule(path string) *S3RuleTable {
 	rule := S3RuleTable{
 		Path: path,
 		UUID: uuid.New().String(),
 	}
-	db.Where("Path = ?", path).FirstOrCreate(&rule)
+	orm.db.Where("Path = ?", path).FirstOrCreate(&rule)
 	return &rule
 }

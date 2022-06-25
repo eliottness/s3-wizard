@@ -28,6 +28,7 @@ type S3FS struct {
 
 	server *fuse.Server
 	rclone *RClone
+    orm    *SQlite
 	done   chan bool
 }
 
@@ -40,6 +41,7 @@ func NewS3FS(loopbackPath, mountPath string, config *ConfigPath) *S3FS {
 		config:       config,
 		rclone:       NewRClone(config),
 		done:         make(chan bool),
+        orm:          NewSQlite(config),
 	}
 }
 
@@ -123,14 +125,12 @@ func (fs *S3FS) Rename(oldPath, newPath string) error {
 		return nil
 	}
 
-	db := Open(fs.config)
-
 	// The file does not need to be tracked or is local
-	if IsEntryLocal(db, oldPath) {
+	if fs.orm.IsEntryLocal(oldPath) {
 		return nil
 	}
 
-	RenameEntry(db, oldPath, newPath)
+	fs.orm.RenameEntry(oldPath, newPath)
 	return nil
 }
 
@@ -144,10 +144,8 @@ func (fs *S3FS) Unlink(path string) error {
 		return nil
 	}
 
-	db := Open(fs.config)
-
 	var entries []S3NodeTable
-	db.Where("Path = ?", path).Limit(1).Find(&entries)
+	fs.orm.db.Where("Path = ?", path).Limit(1).Find(&entries)
 
 	// The file does not need to be tracked
 	if len(entries) == 0 {
@@ -161,7 +159,7 @@ func (fs *S3FS) Unlink(path string) error {
 		}
 	}
 
-	DeleteEntry(db, &entries[0])
+	fs.orm.DeleteEntry(&entries[0])
 
 	return nil
 }
@@ -182,9 +180,7 @@ func (fs *S3FS) Create(fh *S3File) error {
 		return nil
 	}
 
-	db := Open(fs.config)
-	entry := NewEntry(fs.mountPath, fh.Path, stat.Size())
-	db.Create(&entry).Commit()
+	fs.orm.NewEntry(fs.mountPath, fh.Path, stat.Size())
 	return fs.RegisterFH(fh)
 }
 
@@ -203,8 +199,7 @@ func (fs *S3FS) Download(path string) error {
 		return nil
 	}
 
-	db := Open(fs.config)
-	entry := GetEntry(db, fs.mountPath, path)
+	entry := fs.orm.GetEntry(fs.mountPath, path)
 
 	// The file does not need to be tracked or the file is local
 	if entry == nil || entry.Local {
@@ -215,24 +210,19 @@ func (fs *S3FS) Download(path string) error {
 	fs.lockFHs(path)
 	defer fs.unlockFHs(path)
 
-	if err := syscall.Unlink(path); err != nil {
-		fs.logger.Println("Error removing dummy file", err)
-		return err
-	}
-
 	if err := fs.rclone.Download(entry); err != nil {
 		fs.logger.Println("Error while downloading the file", err)
 		return err
 	}
 	// Maybe flock the file but not sure if rclone will work as it will be a child process
 
-	// Replace all file descriptor by the new ones
-	if err := fs.reloadFds(path); err != nil {
-		fs.logger.Printf("Error reloading file descriptors: %v", err)
-		return err
-	}
+	// // Replace all file descriptor by the new ones
+	// if err := fs.reloadFds(path); err != nil {
+	// 	fs.logger.Printf("Error reloading file descriptors: %v", err)
+	// 	return err
+	// }
 
-	RetriveFromServer(db, entry)
+	fs.orm.RetriveFromServer(entry)
 
 	return nil
 }
@@ -251,8 +241,7 @@ func (fs *S3FS) GetSize(path string) (int64, error) {
 		return stat.Size(), nil
 	}
 
-	db := Open(fs.config)
-	entry := GetEntry(db, fs.mountPath, path)
+	entry := fs.orm.GetEntry(fs.mountPath, path)
 
 	// The file does not need to be tracked or the file is local
 	if entry == nil || entry.Local {

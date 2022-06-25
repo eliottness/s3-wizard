@@ -7,8 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
-
-	"gorm.io/gorm"
 )
 
 type customWalkFunc func(path string, info fs.FileInfo) error
@@ -24,8 +22,8 @@ func importFS(rule Rule, config *ConfigPath) error {
 		return nil // Nothing to import
 	}
 
-	db := Open(config)
-	loopbackRoot := config.GetLoopbackFSPath(GetRule(db, rule.Src).UUID)
+	orm := NewSQlite(config)
+	loopbackRoot := config.GetLoopbackFSPath(orm.GetRule(rule.Src).UUID)
 	rclone := NewRClone(config)
 
 	log.Println("Import process: Creating folders ...")
@@ -42,7 +40,7 @@ func importFS(rule Rule, config *ConfigPath) error {
 			newPath := filepath.Join(loopbackRoot, oldPath[len(rule.Src)-1:])
 
 			if info.Mode().IsRegular() {
-				return importFile(oldPath, newPath, info, rule, db, rclone)
+				return importFile(oldPath, newPath, info, rule, orm, rclone)
 			}
 
 			// We need to recreate the symlink correctly
@@ -147,22 +145,21 @@ func customWalkFile(dirPath string, walkFunc customWalkFunc) error {
 }
 
 // Add the file to the DB and send it to remote if we need
-func importFile(oldPath, newPath string, info os.FileInfo, rule Rule, db *gorm.DB, rclone *RClone) error {
+func importFile(oldPath, newPath string, info os.FileInfo, rule Rule, orm *SQlite, rclone *RClone) error {
 
 	var entries []S3NodeTable
 	var entry *S3NodeTable
 
-	db.Model(&entry).Where("Path = ?", oldPath).Find(&entries)
+	orm.db.Model(&entry).Where("Path = ?", oldPath).Find(&entries)
 
 	dest := "local"
 
 	// Update the DB with the new entry
 	if len(entries) == 0 {
-		entry = NewEntry(rule.Src, newPath, info.Size())
-		db.Model(&entry).Create(entry)
+		entry = orm.NewEntry(rule.Src, newPath, info.Size())
 	} else {
 		entry = &entries[0]
-		db.Model(&entry).Where("Path = ?", oldPath).Update("Path", entry.Path)
+		orm.db.Model(&entry).Where("Path = ?", oldPath).Update("Path", entry.Path)
 	}
 
 	if rule.MustBeRemote(oldPath) {
@@ -171,7 +168,7 @@ func importFile(oldPath, newPath string, info os.FileInfo, rule Rule, db *gorm.D
 			return err
 		}
 
-		SendToServer(db, entry, rule.Dest, info.Size())
+		orm.SendToServer(entry, rule.Dest, info.Size())
 
 		if err := syscall.Truncate(oldPath, 0); err != nil {
 			log.Println("Error truncating the file locally", err)

@@ -5,8 +5,6 @@ import (
 	"os"
 	"regexp"
 	"syscall"
-
-	"gorm.io/gorm"
 )
 
 type S3Sender struct {
@@ -16,6 +14,7 @@ type S3Sender struct {
 	config          *ConfigPath
 	stop            chan bool
 	logger          *log.Logger
+	orm             *SQlite
 }
 
 func NewS3Sender(rule *Rule, fs *S3FS, excludePattern []string, config *ConfigPath) (*S3Sender, error) {
@@ -27,6 +26,7 @@ func NewS3Sender(rule *Rule, fs *S3FS, excludePattern []string, config *ConfigPa
 		config:          config,
 		stop:            make(chan bool),
 		logger:          config.NewLogger("SEND: " + rule.Src + " | "),
+		orm:             NewSQlite(config),
 	}
 
 	// Compile regexps
@@ -46,9 +46,8 @@ func (s *S3Sender) Cycle() {
 
 	s.logger.Println("Running SEND Cycle")
 
-	db := Open(s.config)
 	var entries []S3NodeTable
-	db.Model(&S3NodeTable{}).Where("Local = ?", true).Preload("S3RuleTable").Find(&entries)
+	s.orm.db.Model(&S3NodeTable{}).Where("Local = ?", true).Preload("S3RuleTable").Find(&entries)
 
 	for _, entry := range entries {
 		if entry.S3RuleTablePath != s.rule.Src {
@@ -60,12 +59,14 @@ func (s *S3Sender) Cycle() {
 		}
 
 		if s.rule.MustBeRemote(entry.Path) {
-			s.SendRemote(db, &entry)
+			if err := s.SendRemote(&entry); err != nil {
+                s.logger.Println("Error sending remote:", err)
+            }
 		}
 	}
 }
 
-func (s *S3Sender) SendRemote(db *gorm.DB, entry *S3NodeTable) error {
+func (s *S3Sender) SendRemote(entry *S3NodeTable) error {
 
 	// The file does not need to be tracked or the file is already remote
 	if entry == nil || !entry.Local {
@@ -88,17 +89,18 @@ func (s *S3Sender) SendRemote(db *gorm.DB, entry *S3NodeTable) error {
 		return err
 	}
 
-	SendToServer(db, entry, s.rule.Dest, info.Size())
+	s.orm.SendToServer(entry, s.rule.Dest, info.Size())
 
 	if err := syscall.Truncate(entry.Path, 0); err != nil {
 		s.logger.Println("Error truncating the file locally", err)
-	}
-
-	// Replace all file descriptor by the new ones
-	if err := s.fs.reloadFds(entry.Path); err != nil {
-		s.logger.Println("Error reloading file descriptors", err)
 		return err
 	}
+
+	// // Replace all file descriptor by the new ones
+	// if err := s.fs.reloadFds(entry.Path); err != nil {
+	// 	s.logger.Println("Error reloading file descriptors", err)
+	// 	return err
+	// }
 
 	return nil
 }
