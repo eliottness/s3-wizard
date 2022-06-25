@@ -12,9 +12,7 @@ import sqlite3
 
 NB_TRY = 3
 FILESYSTEM_PATH = './tmp'
-LOCAL_AGENT_PATH = os.path.join(os.path.expanduser('~'), '.s3-agent')
-CI_AGENT_PATH = os.path.join(os.path.expanduser('~'), '.config', '.s3-agent')
-S3_AGENT_PATH = CI_AGENT_PATH if os.environ.get('CI') is not None else LOCAL_AGENT_PATH
+S3_AGENT_PATH = "./config"
 
 
 def run_command(cmd, stdout=None, stderr=None, code=None):
@@ -73,8 +71,8 @@ def handle_agent(request):
     run_command(f'rm -rf {S3_AGENT_PATH}', code=0)
 
     # Set config then run s3-agent in sync mode
-    run_command(f'./s3-agent config import {request.param}', code=0)
-    process = subprocess.Popen('./s3-agent sync'.split(' '))
+    run_command(f'./s3-agent --config-folder={S3_AGENT_PATH} config import {request.param}', code=0)
+    process = subprocess.Popen(f'./s3-agent --config-folder={S3_AGENT_PATH} sync'.split(' '))
 
     # Wait for our the filesystem to be ready
     nb_try = 0
@@ -92,6 +90,7 @@ def handle_agent(request):
     connection.close()
     process.send_signal(subprocess.signal.SIGTERM)
     process.wait()
+    run_command(f'rm -rf {S3_AGENT_PATH}', code=0)
 
 
 ######################## TESTS ########################

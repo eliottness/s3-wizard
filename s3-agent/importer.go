@@ -151,7 +151,10 @@ func importFile(oldPath, newPath string, info os.FileInfo, rule Rule, db *gorm.D
 
 	var entries []S3NodeTable
 	var entry *S3NodeTable
+
 	db.Model(&entry).Where("Path = ?", oldPath).Find(&entries)
+
+	dest := "local"
 
 	// Update the DB with the new entry
 	if len(entries) == 0 {
@@ -164,17 +167,20 @@ func importFile(oldPath, newPath string, info os.FileInfo, rule Rule, db *gorm.D
 
 	if rule.MustBeRemote(oldPath) {
 
-		entry := GetEntry(db, rule.Src, oldPath)
-		SendToServer(db, entry, rule.Dest, info.Size())
-		rclone.Send(entry)
-
-		if err := syscall.Truncate(entry.Path, 0); err != nil {
-			log.Println("Error truncating the file locally", err)
+		if err := rclone.Send(rule.Dest, oldPath, entry); err != nil {
+			return err
 		}
-		log.Printf("Imported file: %v -> %v", rule.Dest, oldPath)
-	} else {
-		log.Println("Imported file: local ->", oldPath)
+
+		if err := syscall.Truncate(oldPath, 0); err != nil {
+			log.Println("Error truncating the file locally", err)
+			return err
+		}
+
+		SendToServer(db, entry, rule.Dest, info.Size())
+
+		dest = rule.Dest
 	}
 
+	log.Printf("Imported file: %v -> %v", oldPath, dest)
 	return os.Rename(oldPath, newPath)
 }

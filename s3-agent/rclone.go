@@ -18,6 +18,7 @@ var rcloneBinary []byte
 type RClone struct {
 	config     *Config
 	configPath *ConfigPath
+    logger     *log.Logger
 }
 
 func NewRClone(configPath *ConfigPath) *RClone {
@@ -36,7 +37,7 @@ func NewRClone(configPath *ConfigPath) *RClone {
 		panic(err)
 	}
 
-	return &RClone{configPath: configPath, config: config}
+	return &RClone{configPath: configPath, config: config, logger: configPath.NewLogger("RCLONE: ")}
 }
 
 /// Run the rclone binary with the given arguments.
@@ -56,52 +57,61 @@ func (r *RClone) Run(opts ...subprocess.Option) (int, error) {
 	return pop.ExitCode(), nil
 }
 
-func (r *RClone) getS3Path(entry *S3NodeTable) (string, error) {
+func (r *RClone) getS3Path(server, ruleId, entryId string) string {
 
-	bucket := r.config.RCloneConfig[entry.Server]["bucket"]
-	serverPath := filepath.Join(bucket, "s3-agent", entry.S3RuleTable.UUID, entry.UUID)
+	bucket := r.config.RCloneConfig[server]["bucket"]
+	serverPath := filepath.Join(bucket, "s3-agent", ruleId, entryId)
 
-	return entry.Server + ":" + serverPath, nil
+	return server + ":" + serverPath
 }
 
-func (r *RClone) Send(entry *S3NodeTable) error {
-	s3Path, err := r.getS3Path(entry)
+func (r *RClone) Send(fromPath, server string, entry *S3NodeTable) error {
+    if !entry.Local {
+        r.logger.Println("Warning: Asking RClone to send a remote file")
+        return nil
+    }
 
-	if err != nil {
-		return err
-	}
+	s3Path := r.getS3Path(server, entry.S3RuleTable.UUID, entry.UUID)
 
-	ret, err := r.Run(subprocess.Args("copyto", entry.Path, s3Path))
+	ret, err := r.Run(subprocess.Args("copyto", fromPath, s3Path))
 	if ret != 0 {
-		log.Println("Rclone send failed with exit code: ", ret)
+		r.logger.Println("Rclone send failed with exit code: ", ret)
+        return err
 	}
-	return err
+
+	return nil
 }
 
 func (r *RClone) Download(entry *S3NodeTable) error {
-	s3Path, err := r.getS3Path(entry)
+    if entry.Local {
+        r.logger.Println("Warning: Asking RClone to download a local file")
+        return nil
+    }
 
-	if err != nil {
-		return err
-	}
+	s3Path := r.getS3Path(entry.Server, entry.S3RuleTable.UUID, entry.UUID)
 
 	ret, err := r.Run(subprocess.Args("moveto", s3Path, entry.Path))
 	if ret != 0 {
-		log.Println("Rclone download failed with exit code: ", ret)
+		r.logger.Println("Rclone download failed with exit code: ", ret)
+        return err
 	}
-	return err
+
+	return nil
 }
 
 func (r *RClone) Remove(entry *S3NodeTable) error {
-	s3Path, err := r.getS3Path(entry)
+    if entry.Local {
+        r.logger.Println("Warning: Asking RClone to remove a local file")
+        return nil
+    }
 
-	if err != nil {
-		return err
-	}
+	s3Path := r.getS3Path(entry.Server, entry.S3RuleTable.UUID, entry.UUID)
 
 	ret, err := r.Run(subprocess.Args("deletefile", s3Path))
 	if ret != 0 {
-		log.Println("Rclone remove failed with exit code: ", ret)
+		r.logger.Println("Rclone remove failed with exit code: ", ret)
+        return err
 	}
-	return err
+
+	return nil
 }
