@@ -46,14 +46,14 @@ func (c *ConfigPath) WriteRCloneConfig(config map[string]map[string]string) erro
 			s.Key(key).SetValue(value)
 		}
 	}
-	if err := cfg.SaveTo(c.GetRClonePath()); err != nil {
+	if err := cfg.SaveTo(c.GetRCloneConfigPath()); err != nil {
 		return err
 	}
 
-	return os.Chmod(c.GetRClonePath(), 0600)
+	return os.Chmod(c.GetRCloneConfigPath(), 0600)
 }
 
-func (c *ConfigPath) GetRClonePath() string {
+func (c *ConfigPath) GetRCloneConfigPath() string {
 	// Temporary file, the real unchanging config is in the agent.conf file
 	return filepath.Join(c.folder, "rclone.conf.tmp")
 }
@@ -72,6 +72,10 @@ func (c *ConfigPath) GetAgentPidPath() string {
 
 func (c *ConfigPath) GetDBPath() string {
 	return filepath.Join(c.folder, "sqlite.db")
+}
+
+func (c *ConfigPath) GetRcloneBinaryPath() string {
+    return filepath.Join(c.folder, "rclone")
 }
 
 func (c *ConfigPath) GetLoopbackFSPath(uuid string) string {

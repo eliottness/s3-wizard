@@ -6,16 +6,29 @@ import "C"
 import (
 	_ "embed"
 	"log"
+	"os"
 	"path/filepath"
 
 	"github.com/estebangarcia21/subprocess"
 )
+
+//go:embed rclone
+var rcloneBinary []byte
 
 type RClone struct {
 	config *ConfigPath
 }
 
 func NewRClone(config *ConfigPath) (*RClone, error) {
+
+    rclonePath := config.GetRcloneBinaryPath()
+    file, err := os.OpenFile(rclonePath, os.O_TRUNC | os.O_WRONLY, 0700)
+    if err != nil {
+        return nil, err
+    }
+
+    defer file.Close()
+    file.Write(rcloneBinary)
 
 	return &RClone{config: config}, nil
 }
@@ -27,8 +40,8 @@ func NewRClone(config *ConfigPath) (*RClone, error) {
 /// This file descriptor is passed to execvp with the arguments to run rclone
 func (r *RClone) Run(opts ...subprocess.Option) (int, error) {
 
-	opts = append(opts, subprocess.Args("--config", r.config.GetRClonePath()))
-	pop := subprocess.New("./rclone", opts...)
+	opts = append(opts, subprocess.Args("--config", r.config.GetRCloneConfigPath()))
+	pop := subprocess.New(r.config.GetRcloneBinaryPath(), opts...)
 
 	if err := pop.Exec(); err != nil {
 		return -1, err
