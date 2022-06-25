@@ -18,7 +18,7 @@ type customWalkFunc func(path string, info fs.FileInfo) error
 // Must return a rule.Src path empty
 func importFS(rule Rule, config *ConfigPath) error {
 
-    log.Printf("Content detected at path %v. Starting import process ...", rule.Src)
+	log.Printf("Content detected at path %v. Starting import process ...", rule.Src)
 
 	if _, err := os.Stat(rule.Src); os.IsNotExist(err) {
 		return nil // Nothing to import
@@ -31,22 +31,18 @@ func importFS(rule Rule, config *ConfigPath) error {
 		return err
 	}
 
-    log.Println("Import process: Creating folders ...")
+	log.Println("Import process: Creating folders ...")
 
 	// Creates all folders
-	if err := createDirectories(rule.Src, func(oldPath string, info os.FileInfo) error {
-		newPath := filepath.Join(loopbackRoot, oldPath[len(rule.Src):])
-		return os.Mkdir(newPath, info.Mode())
-	}); err != nil {
+	if err := createDirectories(rule.Src, loopbackRoot, rule.Src); err != nil {
 		return err
 	}
 
-    log.Println("Import process: Copying files ...")
-
+	log.Println("Import process: Copying files ...")
 
 	if err := customWalkFile(rule.Src,
 		func(oldPath string, info os.FileInfo) error {
-			newPath := filepath.Join(loopbackRoot, oldPath[len(rule.Src):])
+			newPath := filepath.Join(loopbackRoot, oldPath[len(rule.Src)-1:])
 
 			if info.Mode().IsRegular() {
 				return importFile(oldPath, newPath, info, rule, db, rclone)
@@ -58,7 +54,7 @@ func importFS(rule Rule, config *ConfigPath) error {
 				if err != nil {
 					return err
 				}
-				pointedNewPath := filepath.Join(loopbackRoot, pointedOldPath[len(rule.Src) - 1:])
+				pointedNewPath := filepath.Join(loopbackRoot, pointedOldPath[len(rule.Src)-1:])
 				return os.Symlink(pointedNewPath, newPath)
 			}
 
@@ -67,19 +63,21 @@ func importFS(rule Rule, config *ConfigPath) error {
 			return nil
 		},
 	); err != nil {
+		return err
+	}
+
+	log.Println("Import process: Deleting folders ...")
+
+	// We delete all folders. If files are still detected, we let the users handle them.
+	if err := deleteDirectories(rule.Src); err != nil {
         return err
     }
 
-    log.Println("Import process: Deleting folders ...")
-
-    // We delete all folders. If files are still detected, we let the users handle them.
-	return createDirectories(rule.Src, func(oldPath string, info os.FileInfo) error {
-		return os.Remove(oldPath)
-	})
+    return os.Remove(rule.Src)
 }
 
 /// Walk only folders
-func createDirectories(dirPath string, walkFunc customWalkFunc) error {
+func createDirectories(dirPath, loopbackRoot, mountPath string) error {
 
 	nodes, err := ioutil.ReadDir(dirPath)
 	if err != nil {
@@ -91,18 +89,20 @@ func createDirectories(dirPath string, walkFunc customWalkFunc) error {
 		if !node.Mode().IsDir() {
 			continue
 		}
-		if err := os.Create(nodePath); err != nil {
-			return err
-		}
-		if err := createDirectories(nodePath, walkFunc); err != nil {
+
+		if err := createDirectories(nodePath, loopbackRoot, mountPath); err != nil {
 			return err
 		}
 
+		newPath := filepath.Join(loopbackRoot, nodePath[len(mountPath)-1:])
+		if err := os.Mkdir(newPath, node.Mode()); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func DeleteDirectories(dirPath string) error {
+func deleteDirectories(dirPath string) error {
 
 	nodes, err := ioutil.ReadDir(dirPath)
 	if err != nil {
@@ -115,11 +115,11 @@ func DeleteDirectories(dirPath string) error {
 			continue
 		}
 
-		if err := DeleteDirectories(nodePath); err != nil {
+		if err := deleteDirectories(nodePath); err != nil {
 			return err
 		}
 
-        if err := os.Remove(nodePath); err != nil {
+		if err := os.Remove(nodePath); err != nil {
 			return err
 		}
 	}
@@ -156,28 +156,28 @@ func importFile(oldPath, newPath string, info os.FileInfo, rule Rule, db *gorm.D
 	var entry *S3NodeTable
 	db.Model(&entry).Where("Path = ?", oldPath).Find(&entries)
 
-    // Update the DB with the new entry
-    if len(entries) == 0 {
-        entry = NewEntry(rule.Src, newPath, info.Size())
-        db.Model(&entry).Create(entry)
-    } else {
-        entry = &entries[0]
-        db.Model(&entry).Where("Path = ?", oldPath).Update("Path", entry.Path)
-    }
+	// Update the DB with the new entry
+	if len(entries) == 0 {
+		entry = NewEntry(rule.Src, newPath, info.Size())
+		db.Model(&entry).Create(entry)
+	} else {
+		entry = &entries[0]
+		db.Model(&entry).Where("Path = ?", oldPath).Update("Path", entry.Path)
+	}
 
-    if rule.MustBeRemote(oldPath) {
+	if rule.MustBeRemote(oldPath) {
 
 		entry := GetEntry(db, rule.Src, oldPath)
-        SendToServer(db, entry, rule.Dest, info.Size())
+		SendToServer(db, entry, rule.Dest, info.Size())
 		rclone.Send(entry)
 
 		if err := syscall.Truncate(entry.Path, 0); err != nil {
 			log.Println("Error truncating the file locally", err)
 		}
-        log.Printf("Imported file: %v -> %v", rule.Dest, oldPath)
+		log.Printf("Imported file: %v -> %v", rule.Dest, oldPath)
 	} else {
-        log.Println("Imported file: local ->", oldPath)
-    }
+		log.Println("Imported file: local ->", oldPath)
+	}
 
 	return os.Rename(oldPath, newPath)
 }
