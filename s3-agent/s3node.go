@@ -116,10 +116,10 @@ func (n *S3Node) Mknod(ctx context.Context, name string, mode, rdev uint32, out 
 		return nil, fs.ToErrno(err)
 	}
 
-    if err := n.preserveOwner(ctx, p); err != nil {
+	if err := n.preserveOwner(ctx, p); err != nil {
 		syscall.Rmdir(p)
 		return nil, fs.ToErrno(err)
-    }
+	}
 
 	st := syscall.Stat_t{}
 	if err := syscall.Lstat(p, &st); err != nil {
@@ -142,10 +142,10 @@ func (n *S3Node) Mkdir(ctx context.Context, name string, mode uint32, out *fuse.
 		return nil, fs.ToErrno(err)
 	}
 
-    if err := n.preserveOwner(ctx, p); err != nil {
+	if err := n.preserveOwner(ctx, p); err != nil {
 		syscall.Rmdir(p)
 		return nil, fs.ToErrno(err)
-    }
+	}
 
 	st := syscall.Stat_t{}
 	if err := syscall.Lstat(p, &st); err != nil {
@@ -322,9 +322,9 @@ func (n *S3Node) Getattr(ctx context.Context, f fs.FileHandle, out *fuse.AttrOut
 		err = syscall.Lstat(p, &st)
 	}
 
-    if err != nil {
-        return fs.ToErrno(err)
-    }
+	if err != nil {
+		return fs.ToErrno(err)
+	}
 
 	// Add the fake size
 	size, err := n.RootData.fs.GetSize(p)

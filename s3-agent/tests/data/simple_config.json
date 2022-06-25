@@ -4,8 +4,8 @@
             "src": "./tmp",
             "dest": "remote",
             "type": "OLDER_THAN",
-            "params": "1s",
-            "cron-sender": "@hourly"
+            "params": "1ns",
+            "cron-sender": "@every 2s"
         }
     ],
     "servers": ["remote"],

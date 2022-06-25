@@ -20,15 +20,15 @@ type S3FS struct {
 	mountPath string
 
 	/// All file handle by paths
-	fhmap   map[string][]*S3File
-	mutex   sync.Mutex
-	logger  *log.Logger
+	fhmap  map[string][]*S3File
+	mutex  sync.Mutex
+	logger *log.Logger
 
-	config  *ConfigPath
+	config *ConfigPath
 
-	server  *fuse.Server
-	rclone  *RClone
-    done    chan bool
+	server *fuse.Server
+	rclone *RClone
+	done   chan bool
 }
 
 func NewS3FS(loopbackPath, mountPath string, config *ConfigPath) *S3FS {
@@ -41,7 +41,7 @@ func NewS3FS(loopbackPath, mountPath string, config *ConfigPath) *S3FS {
 		logger:       config.NewLogger("FUSE: " + mountPath + " | "),
 		config:       config,
 		rclone:       rclone,
-        done:         make(chan bool),
+		done:         make(chan bool),
 	}
 }
 
@@ -88,7 +88,7 @@ func (fs *S3FS) Run(debug bool) error {
 }
 
 func (fs *S3FS) WaitStop() {
-    <-fs.done
+	<-fs.done
 }
 
 func (fs *S3FS) Stop() error {
@@ -101,7 +101,7 @@ func (fs *S3FS) Stop() error {
 		fs.logger.Printf("Error removing root filesystem node '%v': %v", fs.mountPath, err)
 	}
 
-    fs.done<-true
+	fs.done <- true
 
 	return err
 }
@@ -147,7 +147,6 @@ func (fs *S3FS) Unlink(path string) error {
 	}
 
 	db := Open(fs.config)
-	rule := GetRule(db, path)
 
 	var entries []S3NodeTable
 	db.Where("Path = ?", path).Limit(1).Find(&entries)
@@ -157,11 +156,11 @@ func (fs *S3FS) Unlink(path string) error {
 		return nil
 	}
 
-	if !entries[0].IsLocal {
-		if err := fs.rclone.Remove(&entries[0], rule); err != nil {
-            fs.logger.Printf("Error removing the local file: %v", err)
-            return nil
-        }
+	if !entries[0].Local {
+		if err := fs.rclone.Remove(&entries[0]); err != nil {
+			fs.logger.Printf("Error removing the local file: %v", err)
+			return nil
+		}
 	}
 
 	DeleteEntry(db, &entries[0])
@@ -186,7 +185,7 @@ func (fs *S3FS) Create(fh *S3File) error {
 	}
 
 	db := Open(fs.config)
-	entry := NewEntry(fh.Path, stat.Size())
+	entry := NewEntry(fs.mountPath, fh.Path, stat.Size())
 	db.Create(&entry).Commit()
 	return fs.RegisterFH(fh)
 }
@@ -208,10 +207,9 @@ func (fs *S3FS) Download(path string) error {
 
 	db := Open(fs.config)
 	entry := GetEntry(db, path)
-	rule := GetRule(db, path)
 
 	// The file does not need to be tracked or the file is local
-	if entry == nil || entry.IsLocal {
+	if entry == nil || entry.Local {
 		return nil
 	}
 
@@ -221,11 +219,13 @@ func (fs *S3FS) Download(path string) error {
 
 	if err := syscall.Unlink(path); err != nil {
 		fs.logger.Println("Error removing dummy file", err)
+		return err
 	}
 
-	if err := fs.rclone.Download(entry, rule); err != nil {
-        fs.logger.Println("Error while downloading the file", err)
-    }
+	if err := fs.rclone.Download(entry); err != nil {
+		fs.logger.Println("Error while downloading the file", err)
+		return err
+	}
 	// Maybe flock the file but not sure if rclone will work as it will be a child process
 
 	// Replace all file descriptor by the new ones
@@ -257,7 +257,7 @@ func (fs *S3FS) GetSize(path string) (int64, error) {
 	entry := GetEntry(db, path)
 
 	// The file does not need to be tracked or the file is local
-	if entry == nil || entry.IsLocal {
+	if entry == nil || entry.Local {
 		return stat.Size(), nil
 	}
 
@@ -356,7 +356,7 @@ func (fs *S3FS) catchSignals() {
 		sig := <-sigs
 		fs.logger.Printf("Unmounting: %v (Signal: %v)\n", fs.mountPath, sig)
 		if err := fs.Stop(); err != nil {
-            fs.logger.Printf("Error while unmounting: %v\n", fs.mountPath)
-        }
+			fs.logger.Printf("Error while unmounting: %v\n", fs.mountPath)
+		}
 	}()
 }

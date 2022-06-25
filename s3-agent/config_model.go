@@ -100,7 +100,7 @@ func SaveConfig(path string, config *Config) error {
 		return err
 	}
 
-    os.Chmod(path, 0600)
+	os.Chmod(path, 0600)
 
 	return nil
 }

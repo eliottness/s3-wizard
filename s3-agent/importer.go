@@ -87,7 +87,6 @@ func customWalkDir(dirPath string, walkFunc customWalkFunc) error {
 	return nil
 }
 
-
 func customWalkFile(dirPath string, walkFunc customWalkFunc) error {
 
 	nodes, err := ioutil.ReadDir(dirPath)
@@ -118,8 +117,8 @@ func importFile(oldPath, newPath string, info os.FileInfo, rule Rule, db *gorm.D
 	db.Model(&entry).Where("Path = ?", oldPath).Find(&entries)
 
 	if rule.MustBeRemote(oldPath) {
-		ruleEntry := GetRule(db, rule.Src)
-		rclone.Send(entry, ruleEntry)
+		entry := GetEntry(db, oldPath)
+		rclone.Send(entry)
 
 		if err := syscall.Truncate(entry.Path, 0); err != nil {
 			log.Println("Error truncating the file locally", err)
@@ -128,7 +127,7 @@ func importFile(oldPath, newPath string, info os.FileInfo, rule Rule, db *gorm.D
 
 	// Update the DB with the new entry
 	if len(entries) == 0 {
-		entry = NewEntry(newPath, info.Size())
+		entry = NewEntry(rule.Src, newPath, info.Size())
 		db.Model(&entry).Create(entry)
 	} else {
 		entry = &entries[0]
