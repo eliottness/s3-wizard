@@ -24,13 +24,10 @@ func importFS(rule Rule, config *ConfigPath) error {
 
 	db := Open(config)
 	loopbackRoot := config.GetLoopbackFSPath(GetRule(db, rule.Src).UUID)
-	rclone, err := NewRClone(config)
-	if err != nil {
-		return err
-	}
+	rclone := NewRClone(config)
 
 	// Creates all folders
-	err = customWalkDir(rule.Src, func(oldPath string, info os.FileInfo) error {
+	err := customWalkDir(rule.Src, func(oldPath string, info os.FileInfo) error {
 		newPath := filepath.Join(loopbackRoot, oldPath[len(rule.Src):])
 		return os.Mkdir(newPath, info.Mode())
 	})

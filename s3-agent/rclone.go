@@ -16,21 +16,26 @@ import (
 var rcloneBinary []byte
 
 type RClone struct {
-	config *ConfigPath
+	config     *Config
+	configPath *ConfigPath
 }
 
-func NewRClone(config *ConfigPath) (*RClone, error) {
+func NewRClone(configPath *ConfigPath) *RClone {
+	rclonePath := configPath.GetRcloneBinaryPath()
+	file, err := os.OpenFile(rclonePath, os.O_TRUNC|os.O_WRONLY, 0700)
+	if err != nil {
+		panic(err)
+	}
 
-    rclonePath := config.GetRcloneBinaryPath()
-    file, err := os.OpenFile(rclonePath, os.O_TRUNC | os.O_WRONLY, 0700)
-    if err != nil {
-        return nil, err
-    }
+	defer file.Close()
+	file.Write(rcloneBinary)
 
-    defer file.Close()
-    file.Write(rcloneBinary)
+	config, err := LoadConfig(configPath.GetAgentConfigPath())
+	if err != nil {
+		panic(err)
+	}
 
-	return &RClone{config: config}, nil
+	return &RClone{configPath: configPath, config: config}
 }
 
 /// Run the rclone binary with the given arguments.
@@ -40,8 +45,8 @@ func NewRClone(config *ConfigPath) (*RClone, error) {
 /// This file descriptor is passed to execvp with the arguments to run rclone
 func (r *RClone) Run(opts ...subprocess.Option) (int, error) {
 
-	opts = append(opts, subprocess.Args("--config", r.config.GetRCloneConfigPath()))
-	pop := subprocess.New(r.config.GetRcloneBinaryPath(), opts...)
+	opts = append(opts, subprocess.Args("--config", r.configPath.GetRCloneConfigPath()))
+	pop := subprocess.New(r.configPath.GetRcloneBinaryPath(), opts...)
 
 	if err := pop.Exec(); err != nil {
 		return -1, err
@@ -51,12 +56,8 @@ func (r *RClone) Run(opts ...subprocess.Option) (int, error) {
 }
 
 func (r *RClone) getS3Path(entry *S3NodeTable) (string, error) {
-	config, err := LoadConfig(r.config.GetAgentConfigPath())
-	if err != nil {
-		return "", err
-	}
 
-	bucket := config.RCloneConfig[entry.Server]["bucket"]
+	bucket := r.config.RCloneConfig[entry.Server]["bucket"]
 	serverPath := filepath.Join(bucket, "s3-agent", entry.S3RuleTable.UUID, entry.UUID)
 
 	return entry.Server + ":" + serverPath, nil

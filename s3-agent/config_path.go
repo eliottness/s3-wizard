@@ -75,7 +75,7 @@ func (c *ConfigPath) GetDBPath() string {
 }
 
 func (c *ConfigPath) GetRcloneBinaryPath() string {
-    return filepath.Join(c.folder, "rclone")
+	return filepath.Join(c.folder, "rclone")
 }
 
 func (c *ConfigPath) GetLoopbackFSPath(uuid string) string {
