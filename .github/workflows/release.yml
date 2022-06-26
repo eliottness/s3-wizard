@@ -30,7 +30,7 @@ jobs:
             - name: Release Go binary
               uses: wangyoucao577/go-release-action@v1.29
               with:
-                  pre_command: cd s3-agent && apt-get install unzip && make rclone && cd ..
+                  pre_command: cd s3-agent && make rclone && cd ..
                   github_token: ${{ secrets.GITHUB_TOKEN }}
                   goos: linux
                   goarch: amd64

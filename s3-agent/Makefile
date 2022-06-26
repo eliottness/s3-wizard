@@ -14,7 +14,7 @@ all: build
 
 rclone:
 	wget "https://downloads.rclone.org/${RCLONE_VERSION}/${RCLONE_ARCHIVE}.zip"
-	unzip "${RCLONE_ARCHIVE}.zip"
+	7z x "${RCLONE_ARCHIVE}.zip"
 	cp "${RCLONE_ARCHIVE}/rclone" .
 	rm -rf "${RCLONE_ARCHIVE}.zip" "${RCLONE_ARCHIVE}"
 
