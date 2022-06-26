@@ -36,3 +36,4 @@ jobs:
         goarch: amd64
         release_tag: ${{ env.RELEASE_VERSION }}
         project_path: "./s3-agent"
+        binary_name: "s3-agent"
