@@ -2,7 +2,7 @@ import os
 import pytest
 import time
 
-from .utils import assert_rclone_file, assert_entry_state, FILESYSTEM_PATH
+from .utils import assert_agent_file, assert_rclone_file, assert_entry_state, FILESYSTEM_PATH, create_file
 
 
 @pytest.mark.usefixtures('handle_server')
@@ -12,83 +12,59 @@ class TestS3AgentClassBasic:
 
     def test_simple_file(self, handle_agent):
         ### GIVEN ###
-        with open(f'{FILESYSTEM_PATH}/test_simple_file.txt', 'w') as file:
-            file.write('Hello world')
+        file_path = 'test_simple_file.txt'
+        content = 'Hello world'
 
-        assert_entry_state(handle_agent, 'test_simple_file.txt', 0, 1, '')
+        create_file(file_path, content, handle_agent)
 
         ### WHEN ###
         time.sleep(2)
 
         ### THEN ###
-        assert_rclone_file(handle_agent, 'test_simple_file.txt')
-        assert_entry_state(handle_agent, 'test_simple_file.txt', 11, 0, 'remote')
-
-        with open(f'{FILESYSTEM_PATH}/test_simple_file.txt') as file:
-            assert file.readlines()[0] == 'Hello world'
-
-        assert_entry_state(handle_agent, 'test_simple_file.txt', 11, 1, '')
+        assert_agent_file(handle_agent, file_path, content)
 
 
     def test_simple_folder(self, handle_agent):
         ### GIVEN ###
         file_path = 'test_simple_folder/test_simple_file.txt'
+        content = 'Hello world'
 
-        os.mkdir(f'{FILESYSTEM_PATH}/test_simple_folder')
-        with open(f'{FILESYSTEM_PATH}/{file_path}', 'w') as file:
-            file.write('Hello world')
-
-        assert_entry_state(handle_agent, file_path, 0, 1, '')
+        create_file(file_path, content, handle_agent)
 
         ### WHEN ###
         time.sleep(2)
 
         ### THEN ###
-        assert_rclone_file(handle_agent, file_path)
-        assert_entry_state(handle_agent, file_path, 11, 0, 'remote')
-
-        with open(f'{FILESYSTEM_PATH}/{file_path}') as file:
-            assert file.readlines()[0] == 'Hello world'
-
-        assert_entry_state(handle_agent, file_path, 11, 1, '')
+        assert_agent_file(handle_agent, file_path, content)
 
 
     def test_subfolder(self, handle_agent):
         ### GIVEN ###
         file_path = 'folder/subfolder/test_simple_file.txt'
+        content = 'Hello world'
 
-        os.makedirs(f'{FILESYSTEM_PATH}/folder/subfolder')
-        with open(f'{FILESYSTEM_PATH}/{file_path}', 'w') as file:
-            file.write('Hello world')
-
-        assert_entry_state(handle_agent, file_path, 0, 1, '')
+        create_file(file_path, content, handle_agent)
 
         ### WHEN ###
         time.sleep(2)
 
         ### THEN ###
-        assert_rclone_file(handle_agent, file_path)
-        assert_entry_state(handle_agent, file_path, 11, 0, 'remote')
-
-        with open(f'{FILESYSTEM_PATH}/{file_path}') as file:
-            assert file.readlines()[0] == 'Hello world'
-
-        assert_entry_state(handle_agent, file_path, 11, 1, '')
+        assert_agent_file(handle_agent, file_path, content)
 
 
     def test_same_name_files(self, handle_agent):
         ### GIVEN ###
-        os.mkdir(f'{FILESYSTEM_PATH}/test_simple_folder')
-        with open(f'{FILESYSTEM_PATH}/test_simple_folder/test_simple_file.txt', 'w') as file:
-            file.write('Hello world')
-        with open(f'{FILESYSTEM_PATH}/test_simple_file.txt', 'w') as file:
-            file.write('Hello world 2')
+        first_file_path = 'test_simple_file.txt'
+        second_file_path = 'folder/test_simple_file.txt'
+        first_content = 'Hello world first'
+        second_content = 'Hello world second'
+
+        create_file(first_file_path, first_content, handle_agent)
+        create_file(second_file_path, second_content, handle_agent)
 
         ### WHEN ###
         time.sleep(2)
 
         ### THEN ###
-        with open(f'{FILESYSTEM_PATH}/test_simple_folder/test_simple_file.txt') as file:
-            assert file.readlines()[0] == 'Hello world'
-        with open(f'{FILESYSTEM_PATH}/test_simple_file.txt') as file:
-            assert file.readlines()[0] == 'Hello world 2'
+        assert_agent_file(handle_agent, first_file_path, first_content)
+        assert_agent_file(handle_agent, second_file_path, second_content)

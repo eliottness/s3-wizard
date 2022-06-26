@@ -48,6 +48,15 @@ def stop_agent(process, connection, reset_env=True):
         run_command(f'rm -rf {S3_AGENT_PATH} {FILESYSTEM_PATH}', code=0)
 
 
+def create_file(file_path, content, cursor=None, agent=True):
+    parent_path = os.path.abspath(os.path.join(FILESYSTEM_PATH, file_path, '..'))
+    os.makedirs(parent_path, exist_ok=True)
+    with open(f'{FILESYSTEM_PATH}/{file_path}', 'w') as file:
+        file.write(content)
+    if agent:
+        assert_entry_state(cursor, file_path, 0, 1, '')
+
+
 def get_rule_entry(cursor):
     cursor.execute("SELECT * FROM s3_rule_tables")
     return cursor.fetchone()
@@ -75,3 +84,13 @@ def assert_entry_state(cursor, filename, size, Local, server):
     assert entry[1] == size, entry
     assert entry[2] == Local, entry
     assert entry[4] == server, entry
+
+
+def assert_agent_file(cursor, file_path, content):
+    assert_rclone_file(cursor, file_path)
+    assert_entry_state(cursor, file_path, len(content), 0, 'remote')
+
+    with open(f'{FILESYSTEM_PATH}/{file_path}') as file:
+        assert file.readlines()[0] == content
+
+    assert_entry_state(cursor, file_path, len(content), 1, '')
