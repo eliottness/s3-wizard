@@ -37,7 +37,7 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 	}
 
 	rule := config.Rules[0]
-    orm := NewSQlite(ctx.ConfigPath)
+	orm := NewSQlite(ctx.ConfigPath)
 	dbEntry := orm.AddIfNotExistsRule(rule.Src)
 	loopback := ctx.ConfigPath.GetLoopbackFSPath(dbEntry.UUID)
 

@@ -159,12 +159,12 @@ func importFile(oldPath, newPath string, info os.FileInfo, rule Rule, orm *SQlit
 		entry = orm.NewEntry(rule.Src, newPath, info.Size())
 	} else {
 		entry = &entries[0]
-		orm.db.Model(&entry).Where("Path = ?", oldPath).Update("Path", entry.Path)
+		orm.db.Model(&entry).Where("Path = ?", oldPath).Preload("S3RuleTable").Update("Path", entry.Path)
 	}
 
 	if rule.MustBeRemote(oldPath) {
 
-		if err := rclone.Send(rule.Dest, entry); err != nil {
+		if err := rclone.Send(rule.Dest, oldPath, entry); err != nil {
 			return err
 		}
 

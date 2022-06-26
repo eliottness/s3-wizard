@@ -60,8 +60,8 @@ func (s *S3Sender) Cycle() {
 
 		if s.rule.MustBeRemote(entry.Path) {
 			if err := s.SendRemote(&entry); err != nil {
-                s.logger.Println("Error sending remote:", err)
-            }
+				s.logger.Println("Error sending remote:", err)
+			}
 		}
 	}
 }
@@ -84,7 +84,7 @@ func (s *S3Sender) SendRemote(entry *S3NodeTable) error {
 		return err
 	}
 
-	if err := s.fs.rclone.Send(s.rule.Dest, entry); err != nil {
+	if err := s.fs.rclone.Send(s.rule.Dest, entry.Path, entry); err != nil {
 		s.logger.Println("Error sending the file", err)
 		return err
 	}

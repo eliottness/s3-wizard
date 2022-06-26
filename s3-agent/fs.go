@@ -28,7 +28,7 @@ type S3FS struct {
 
 	server *fuse.Server
 	rclone *RClone
-    orm    *SQlite
+	orm    *SQlite
 	done   chan bool
 }
 
@@ -41,7 +41,7 @@ func NewS3FS(loopbackPath, mountPath string, config *ConfigPath) *S3FS {
 		config:       config,
 		rclone:       NewRClone(config),
 		done:         make(chan bool),
-        orm:          NewSQlite(config),
+		orm:          NewSQlite(config),
 	}
 }
 

@@ -2,15 +2,12 @@ import os
 import pytest
 import time
 
-from .utils import assert_rclone_file, assert_entry_state
-
-
-FILESYSTEM_PATH = './tmp'
+from .utils import assert_rclone_file, assert_entry_state, FILESYSTEM_PATH
 
 
 @pytest.mark.usefixtures('handle_server')
 @pytest.mark.parametrize('handle_agent', ['tests/data/simple_config.json'], indirect=True)
-class TestS3AgentClass:
+class TestS3AgentClassBasic:
 
 
     def test_simple_file(self, handle_agent):
@@ -35,9 +32,9 @@ class TestS3AgentClass:
 
     def test_simple_folder(self, handle_agent):
         ### GIVEN ###
-        os.mkdir(f'{FILESYSTEM_PATH}/test_simple_folder')
         file_path = 'test_simple_folder/test_simple_file.txt'
 
+        os.mkdir(f'{FILESYSTEM_PATH}/test_simple_folder')
         with open(f'{FILESYSTEM_PATH}/{file_path}', 'w') as file:
             file.write('Hello world')
 
@@ -58,9 +55,9 @@ class TestS3AgentClass:
 
     def test_subfolder(self, handle_agent):
         ### GIVEN ###
-        os.makedirs(f'{FILESYSTEM_PATH}/folder/subfolder')
         file_path = 'folder/subfolder/test_simple_file.txt'
 
+        os.makedirs(f'{FILESYSTEM_PATH}/folder/subfolder')
         with open(f'{FILESYSTEM_PATH}/{file_path}', 'w') as file:
             file.write('Hello world')
 
