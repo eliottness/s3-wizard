@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/estebangarcia21/subprocess"
 )
@@ -57,10 +58,17 @@ func (r *RClone) Run(opts ...subprocess.Option) (int, error) {
 	return pop.ExitCode(), nil
 }
 
-func (r *RClone) getS3Path(server, ruleId, entryId string) string {
+func (r *RClone) getS3Path(server, ruleId, fromPath string) string {
 
 	bucket := r.config.RCloneConfig[server]["bucket"]
-	serverPath := filepath.Join(bucket, "s3-agent", ruleId, entryId)
+
+	serverPath := ""
+	fsPath := filepath.Join(r.configPath.folder, ruleId)
+	if relativePath, err := filepath.Rel(fsPath, fromPath); err == nil && !strings.HasPrefix(relativePath, "..") {
+		serverPath = filepath.Join(bucket, "s3-agent", ruleId, relativePath)
+	} else if relativePath, err := filepath.Rel(r.config.Rules[0].Src, fromPath); err == nil && !strings.HasPrefix(relativePath, "..") {
+		serverPath = filepath.Join(bucket, "s3-agent", ruleId, relativePath)
+	}
 
 	return server + ":" + serverPath
 }
@@ -71,7 +79,7 @@ func (r *RClone) Send(server, fromPath string, entry *S3NodeTable) error {
 		return nil
 	}
 
-	s3Path := r.getS3Path(server, entry.S3RuleTable.UUID, entry.UUID)
+	s3Path := r.getS3Path(server, entry.S3RuleTable.UUID, fromPath)
 
 	ret, err := r.Run(subprocess.Args("copyto", fromPath, s3Path))
 	if ret != 0 {
@@ -82,13 +90,13 @@ func (r *RClone) Send(server, fromPath string, entry *S3NodeTable) error {
 	return nil
 }
 
-func (r *RClone) Download(entry *S3NodeTable) error {
+func (r *RClone) Download(entry *S3NodeTable, path string) error {
 	if entry.Local {
 		r.logger.Println("Warning: Asking RClone to download a local file")
 		return nil
 	}
 
-	s3Path := r.getS3Path(entry.Server, entry.S3RuleTable.UUID, entry.UUID)
+	s3Path := r.getS3Path(entry.Server, entry.S3RuleTable.UUID, entry.Path)
 
 	ret, err := r.Run(subprocess.Args("moveto", s3Path, entry.Path))
 	if ret != 0 {
@@ -105,7 +113,7 @@ func (r *RClone) Remove(entry *S3NodeTable) error {
 		return nil
 	}
 
-	s3Path := r.getS3Path(entry.Server, entry.S3RuleTable.UUID, entry.UUID)
+	s3Path := r.getS3Path(entry.Server, entry.S3RuleTable.UUID, entry.Path)
 
 	ret, err := r.Run(subprocess.Args("deletefile", s3Path))
 	if ret != 0 {

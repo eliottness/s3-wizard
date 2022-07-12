@@ -69,13 +69,13 @@ def get_node_entry(cursor, filename):
     return cursor.fetchone()
 
 
-def assert_rclone_file(cursor, filename):
+def assert_rclone_file(cursor, file_path):
     rule_entry = get_rule_entry(cursor)
-    node_entry = get_node_entry(cursor, filename)
-    s3_file_path = os.path.join("remote:bucket-test/s3-agent", rule_entry[0], node_entry[3])
+    s3_file_path = os.path.join("remote:bucket-test/s3-agent", rule_entry[0], file_path)
     rclone_config_path = os.path.join(S3_AGENT_PATH, 'rclone.conf.tmp')
     cmd = f'./rclone --config {rclone_config_path} lsf {s3_file_path}'
-    run_command(cmd, stdout=node_entry[3] + '\n', stderr='', code=0)
+    expected = os.path.basename(os.path.normpath(file_path)) + '\n'
+    run_command(cmd, stdout=expected, stderr='', code=0)
 
 
 def assert_entry_state(cursor, filename, size, Local, server):
