@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 	"os"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"unsafe"
 )
@@ -30,4 +32,15 @@ func IsRegFile(path string) bool {
 	}
 
 	return stat.Mode().IsRegular()
+}
+
+func IsSubpath(path, subpath string, out *string) bool {
+	relativePath, err := filepath.Rel(path, subpath)
+	if err == nil && !strings.HasPrefix(relativePath, "..") {
+		if out != nil {
+			*out = relativePath
+		}
+		return true
+	}
+	return false
 }

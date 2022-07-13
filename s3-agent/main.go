@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 	"syscall"
 
 	"github.com/alecthomas/kong"
@@ -95,7 +94,7 @@ func (cmd *TestRuleCmd) Run(ctx *Context) error {
 			}
 
 			// The given file path is not in the rule filesystem
-			if relativePath, err := filepath.Rel(ruleSrc, cmd.Path); err != nil || strings.HasPrefix(relativePath, "..") {
+			if !IsSubpath(ruleSrc, cmd.Path, nil) {
 				log.Fatal("File is not part of the rule file system")
 			}
 

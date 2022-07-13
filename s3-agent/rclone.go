@@ -9,7 +9,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/estebangarcia21/subprocess"
 )
@@ -61,13 +60,15 @@ func (r *RClone) Run(opts ...subprocess.Option) (int, error) {
 
 func (r *RClone) getS3Path(server, ruleId, fromPath string) (string, error) {
 
-	bucket := r.config.RCloneConfig[server]["bucket"]
-
 	serverPath := ""
+	relativePath := ""
+
+	bucket := r.config.RCloneConfig[server]["bucket"]
 	fsPath := filepath.Join(r.configPath.folder, ruleId)
-	if relativePath, err := filepath.Rel(fsPath, fromPath); err == nil && !strings.HasPrefix(relativePath, "..") {
+
+	if IsSubpath(fsPath, fromPath, &relativePath) {
 		serverPath = filepath.Join(bucket, "s3-agent", ruleId, relativePath)
-	} else if relativePath, err := filepath.Rel(r.config.Rules[0].Src, fromPath); err == nil && !strings.HasPrefix(relativePath, "..") {
+	} else if IsSubpath(r.config.Rules[0].Src, fromPath, &relativePath) {
 		serverPath = filepath.Join(bucket, "s3-agent", ruleId, relativePath)
 	} else {
 		return "", fmt.Errorf("Could not find relative path for : %s", fromPath)
