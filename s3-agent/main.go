@@ -13,7 +13,7 @@ import (
 	"github.com/robfig/cron"
 )
 
-const version = "0.1.0"
+const version = "0.1.1"
 
 type Context struct {
 	ConfigPath *ConfigPath
