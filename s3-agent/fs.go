@@ -210,7 +210,7 @@ func (fs *S3FS) Download(path string) error {
 	fs.lockFHs(path)
 	defer fs.unlockFHs(path)
 
-	if err := fs.rclone.Download(entry); err != nil {
+	if err := fs.rclone.Download(entry, path); err != nil {
 		fs.logger.Println("Error while downloading the file", err)
 		return err
 	}
