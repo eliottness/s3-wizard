@@ -22,9 +22,6 @@ type Context struct {
 type SyncCmd struct{}
 
 func (cmd *SyncCmd) Run(ctx *Context) error {
-
-	doSelfUpdate()
-
 	config, err := LoadConfig(ctx.ConfigPath.GetAgentConfigPath())
 	if err != nil {
 		log.Println("Cannot load config", err)
@@ -32,7 +29,8 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 	}
 
 	if err = ctx.ConfigPath.WriteRCloneConfig(config.RCloneConfig); err != nil {
-		return err
+        log.Println("Cannot write rclone config", err)
+        return err
 	}
 
 	rule := config.Rules[0]
@@ -43,6 +41,7 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 	if _, err := os.Stat(rule.Src); err == nil {
 
 		if err := importFS(rule, ctx.ConfigPath, orm); err != nil {
+            log.Println("Error while importing existing files: ", err)
 			return err
 		}
 
@@ -71,6 +70,48 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 
 	cron.Stop()
 	return nil
+}
+
+type RebuildDbCmd struct {
+    UUID string `arg:"" help:"UUID of the rule to be used to rebuild the database"`
+    RuleNumber int `arg:"" help:"Number of the rule to rebuild"`
+}
+
+func (cmd *RebuildDbCmd) Run(ctx *Context) error {
+    config, err := LoadConfig(ctx.ConfigPath.GetAgentConfigPath())
+	if err != nil {
+		log.Println("Cannot load config", err)
+		return err
+	}
+
+    if err = ctx.ConfigPath.WriteRCloneConfig(config.RCloneConfig); err != nil {
+        log.Println("Cannot write rclone config", err)
+        return err
+	}
+
+    if cmd.RuleNumber < 0 || cmd.RuleNumber >= len(config.Rules) {
+        return fmt.Errorf("Invalid Rule number: %d", cmd.RuleNumber)
+    }
+
+    rule := config.Rules[cmd.RuleNumber]
+    orm := NewSQlite(ctx.ConfigPath)
+	orm.AddOrUpdateRule(rule.Src, cmd.UUID)
+
+    ruleFolder := ctx.ConfigPath.GetLoopbackFSPath(cmd.UUID)
+
+    filepath.Walk(ruleFolder, func(path string, info os.FileInfo, err error) error {
+        if err != nil {
+            return err
+        }
+
+        if !info.IsDir() {
+            orm.CreateEntry(cmd.UUID, path, info.Size())
+        }
+
+        return nil
+    })
+
+    return nil
 }
 
 type TestRuleCmd struct {
@@ -185,6 +226,7 @@ func doSelfUpdate() {
 }
 
 func main() {
+    doSelfUpdate()
 	cli := &CLI{
 		Debug:        false,
 		ConfigFolder: "",
