@@ -139,8 +139,8 @@ func (orm *SQlite) AddOrUpdateRule(path, uuid string) {
 		UUID: uuid,
 	}
 
-    // Try to update the rule, if it doesn't exist, create it
-    if orm.db.Model(&rule).Where("Path = ?", path).Updates(&rule).RowsAffected == 0 {
-    	orm.db.Where("Path = ?", path).Create(&rule)
-    }
+	// Try to update the rule, if it doesn't exist, create it
+	if orm.db.Model(&rule).Where("Path = ?", path).Updates(&rule).RowsAffected == 0 {
+		orm.db.Where("Path = ?", path).Create(&rule)
+	}
 }

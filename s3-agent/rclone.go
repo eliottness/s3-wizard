@@ -9,6 +9,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 
 	"github.com/estebangarcia21/subprocess"
 )
@@ -46,16 +48,16 @@ func NewRClone(configPath *ConfigPath) *RClone {
 /// This function create a memory space associated with a file descriptor.
 /// It copies the rclone binary to the memory space.
 /// This file descriptor is passed to execvp with the arguments to run rclone
-func (r *RClone) Run(opts ...subprocess.Option) (int, error) {
+func (r *RClone) Run(opts ...subprocess.Option) (int, string, string, error) {
 
 	opts = append(opts, subprocess.Args("--config", r.configPath.GetRCloneConfigPath()))
 	pop := subprocess.New(r.configPath.GetRCloneBinaryPath(), opts...)
 
 	if err := pop.Exec(); err != nil {
-		return -1, err
+		return -1, "", "", err
 	}
 
-	return pop.ExitCode(), nil
+	return pop.ExitCode(), string(pop.Stdout()), string(pop.Stderr()), nil
 }
 
 func (r *RClone) getS3Path(server, ruleId, fromPath string) (string, error) {
@@ -88,16 +90,16 @@ func (r *RClone) Send(server, fromPath string, entry *S3NodeTable) error {
 		return err
 	}
 
-	ret, err := r.Run(subprocess.Args("copyto", fromPath, s3Path))
+	ret, _, stderr, err := r.Run(subprocess.Args("copyto", fromPath, s3Path))
 	if ret != 0 {
-		r.logger.Println("Rclone send failed with exit code: ", ret)
+		r.logger.Printf("Rclone send failed with exit code: %d\n%s", ret, stderr)
 		return err
 	}
 
 	return nil
 }
 
-func (r *RClone) Download(entry *S3NodeTable, path string) error {
+func (r *RClone) Download(entry *S3NodeTable) error {
 	if entry.Local {
 		r.logger.Println("Warning: Asking RClone to download a local file")
 		return nil
@@ -108,9 +110,9 @@ func (r *RClone) Download(entry *S3NodeTable, path string) error {
 		return err
 	}
 
-	ret, err := r.Run(subprocess.Args("moveto", s3Path, entry.Path))
+	ret, _, stderr, err := r.Run(subprocess.Args("moveto", s3Path, entry.Path))
 	if ret != 0 {
-		r.logger.Println("Rclone download failed with exit code: ", ret)
+		r.logger.Printf("Rclone download failed with exit code: %d\n%s", ret, stderr)
 		return err
 	}
 
@@ -128,11 +130,42 @@ func (r *RClone) Remove(entry *S3NodeTable) error {
 		return err
 	}
 
-	ret, err := r.Run(subprocess.Args("deletefile", s3Path))
+	ret, _, stderr, err := r.Run(subprocess.Args("deletefile", s3Path))
 	if ret != 0 {
-		r.logger.Println("Rclone remove failed with exit code: ", ret)
+		r.logger.Printf("Rclone remove failed with exit code: %d\n%s", ret, stderr)
 		return err
 	}
 
 	return nil
+}
+
+func (r *RClone) GetSize(entry *S3NodeTable) (int64, error) {
+	if entry.Local {
+		r.logger.Println("Warning: Asking RClone to remove a local file")
+		return -1, nil
+	}
+
+	s3Path, err := r.getS3Path(entry.Server, entry.S3RuleTable.UUID, entry.Path)
+	if err != nil {
+		return -1, err
+	}
+
+	ret, stdout, stderr, err := r.Run(subprocess.Args("size", s3Path))
+	if ret != 0 {
+		r.logger.Printf("Rclone remove failed with exit code: %d\n%s", ret, stderr)
+		return -1, err
+	}
+
+	regex := regexp.MustCompile(`((?P<Size>\d+) Byte)`)
+	match := regex.FindStringSubmatch(stdout)
+	if len(match) == 0 {
+		return -1, fmt.Errorf("Could not find size in output: %s", stdout)
+	}
+
+	size, err := strconv.ParseInt(match[1], 10, 64)
+	if err != nil {
+		return -1, err
+	}
+
+	return size, nil
 }
