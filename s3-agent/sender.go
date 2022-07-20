@@ -17,7 +17,7 @@ type S3Sender struct {
 	orm             *SQlite
 }
 
-func NewS3Sender(rule *Rule, fs *S3FS, excludePattern []string, config *ConfigPath) (*S3Sender, error) {
+func NewS3Sender(rule *Rule, fs *S3FS, excludePattern []string, config *ConfigPath, orm *SQlite) (*S3Sender, error) {
 
 	s := &S3Sender{
 		rule:            rule,
@@ -26,7 +26,7 @@ func NewS3Sender(rule *Rule, fs *S3FS, excludePattern []string, config *ConfigPa
 		config:          config,
 		stop:            make(chan bool),
 		logger:          config.NewLogger("SEND: " + rule.Src + " | "),
-		orm:             NewSQlite(config),
+		orm:             orm,
 	}
 
 	// Compile regexps
@@ -45,6 +45,11 @@ func NewS3Sender(rule *Rule, fs *S3FS, excludePattern []string, config *ConfigPa
 func (s *S3Sender) Cycle() {
 
 	s.logger.Println("Running SEND Cycle")
+
+	if len(s.fs.orm.batch) > 0 {
+		s.fs.orm.db.Create(&s.fs.orm.batch)
+		s.fs.orm.batch = make([]*S3NodeTable, 0)
+	}
 
 	var entries []S3NodeTable
 	s.orm.db.Model(&S3NodeTable{}).Where("Local = ?", true).Preload("S3RuleTable").Find(&entries)

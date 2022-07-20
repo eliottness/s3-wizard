@@ -3,10 +3,12 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 /// The database table for the file entries
@@ -31,11 +33,21 @@ type SQlite struct {
 	db     *gorm.DB
 	logger *log.Logger
 	config *ConfigPath
+	batch  []*S3NodeTable
 }
 
 func NewSQlite(config *ConfigPath) *SQlite {
+	// Personalize default db logger to ignore RecordNotFound error
+	db, err := gorm.Open(sqlite.Open(config.GetDBPath()), &gorm.Config{
+		Logger: logger.New(log.New(os.Stdout, "\r\n", log.LstdFlags),
+			logger.Config{
+				SlowThreshold:             200 * time.Millisecond,
+				LogLevel:                  logger.Warn,
+				IgnoreRecordNotFoundError: true,
+				Colorful:                  true,
+			}),
+	})
 
-	db, err := gorm.Open(sqlite.Open(config.GetDBPath()), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
@@ -48,26 +60,12 @@ func NewSQlite(config *ConfigPath) *SQlite {
 		db:     db,
 		logger: config.NewLogger("SQLITE: "),
 		config: config,
+		batch:  make([]*S3NodeTable, 0),
 	}
 }
 
-/// Returns a file entry from the database
-func (orm *SQlite) GetEntry(rulePath, path string) *S3NodeTable {
-	entry := S3NodeTable{
-		Path:            path,
-		Size:            0,
-		Local:           true,
-		UUID:            uuid.New().String(),
-		Server:          "",
-		S3RuleTablePath: rulePath,
-	}
-	orm.db.Where("Path = ?", path).Preload("S3RuleTable").FirstOrCreate(&entry)
-	return &entry
-}
-
-/// Adds a file entry to the database
-func (orm *SQlite) NewEntry(rulePath, path string, size int64) *S3NodeTable {
-	entry := S3NodeTable{
+func (orm *SQlite) GetNewEntry(rulePath, path string, size int64) *S3NodeTable {
+	return &S3NodeTable{
 		Path:            path,
 		Size:            size,
 		Local:           true,
@@ -75,9 +73,24 @@ func (orm *SQlite) NewEntry(rulePath, path string, size int64) *S3NodeTable {
 		Server:          "",
 		S3RuleTablePath: rulePath,
 	}
+}
 
-	orm.db.Where("Path = ?", path).Preload("S3RuleTable").FirstOrCreate(&entry)
-	return &entry
+/// Returns a file entry from the database
+func (orm *SQlite) CreateEntry(rulePath, path string, size int64) *S3NodeTable {
+	entry := orm.GetNewEntry(rulePath, path, size)
+	if result := orm.db.Where("Path = ?", path).Preload("S3RuleTable").FirstOrCreate(entry); result.Error != nil {
+		return nil
+	}
+	return entry
+}
+
+/// Returns a file entry from the database
+func (orm *SQlite) GetEntry(rulePath, path string, size int64) *S3NodeTable {
+	entry := orm.GetNewEntry(rulePath, path, size)
+	if result := orm.db.Where("Path = ?", path).Preload("S3RuleTable").First(entry); result.Error != nil {
+		return nil
+	}
+	return entry
 }
 
 /// Tell the DB that the file is remote now

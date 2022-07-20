@@ -15,7 +15,7 @@ class TestS3AgentClassBasic:
         file_path = 'test_simple_file.txt'
         content = 'Hello world'
 
-        create_file(file_path, content, handle_agent)
+        create_file(file_path, content)
 
         ### WHEN ###
         time.sleep(2)
@@ -29,7 +29,7 @@ class TestS3AgentClassBasic:
         file_path = 'test_simple_folder/test_simple_file.txt'
         content = 'Hello world'
 
-        create_file(file_path, content, handle_agent)
+        create_file(file_path, content)
 
         ### WHEN ###
         time.sleep(2)
@@ -43,7 +43,7 @@ class TestS3AgentClassBasic:
         file_path = 'folder/subfolder/test_simple_file.txt'
         content = 'Hello world'
 
-        create_file(file_path, content, handle_agent)
+        create_file(file_path, content)
 
         ### WHEN ###
         time.sleep(2)
@@ -59,8 +59,8 @@ class TestS3AgentClassBasic:
         first_content = 'Hello world first'
         second_content = 'Hello world second'
 
-        create_file(first_file_path, first_content, handle_agent)
-        create_file(second_file_path, second_content, handle_agent)
+        create_file(first_file_path, first_content)
+        create_file(second_file_path, second_content)
 
         ### WHEN ###
         time.sleep(2)

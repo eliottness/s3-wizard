@@ -14,7 +14,7 @@ type customWalkFunc func(path string, info fs.FileInfo) error
 // Is Supposed to ask the user if he want to import the current existing folder to
 // the s3-agent filesystem
 // Must return a rule.Src path empty
-func importFS(rule Rule, config *ConfigPath) error {
+func importFS(rule Rule, config *ConfigPath, orm *SQlite) error {
 
 	log.Printf("Content detected at path %v. Starting import process ...", rule.Src)
 
@@ -22,7 +22,6 @@ func importFS(rule Rule, config *ConfigPath) error {
 		return nil // Nothing to import
 	}
 
-	orm := NewSQlite(config)
 	loopbackRoot := config.GetLoopbackFSPath(orm.GetRule(rule.Src).UUID)
 	rclone := NewRClone(config)
 
@@ -156,7 +155,7 @@ func importFile(oldPath, newPath string, info os.FileInfo, rule Rule, orm *SQlit
 
 	// Update the DB with the new entry
 	if len(entries) == 0 {
-		entry = orm.NewEntry(rule.Src, newPath, info.Size())
+		entry = orm.CreateEntry(rule.Src, newPath, info.Size())
 	} else {
 		entry = &entries[0]
 		orm.db.Model(&entry).Where("Path = ?", oldPath).Preload("S3RuleTable").Update("Path", entry.Path)

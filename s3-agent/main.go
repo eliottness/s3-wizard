@@ -42,7 +42,7 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 
 	if _, err := os.Stat(rule.Src); err == nil {
 
-		if err := importFS(rule, ctx.ConfigPath); err != nil {
+		if err := importFS(rule, ctx.ConfigPath, orm); err != nil {
 			return err
 		}
 
@@ -51,8 +51,8 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 		}
 	}
 
-	fs := NewS3FS(loopback, rule.Src, ctx.ConfigPath)
-	sender, err := NewS3Sender(&rule, fs, config.ExcludePatterns, ctx.ConfigPath)
+	fs := NewS3FS(loopback, rule.Src, ctx.ConfigPath, orm)
+	sender, err := NewS3Sender(&rule, fs, config.ExcludePatterns, ctx.ConfigPath, orm)
 	if err != nil {
 		log.Println("Failed to create Cron sender", err)
 		return err
@@ -144,10 +144,12 @@ func (cmd *ImportConfigCmd) Run(ctx *Context) error {
 		log.Fatalln(err)
 	}
 
+	orm := NewSQlite(ctx.ConfigPath)
+
 	for _, rule := range config.Rules {
 		if _, err := os.Stat(rule.Src); os.IsExist(err) {
 			// A folder exists, import it into the loopback folder and in the DB
-			importFS(rule, ctx.ConfigPath)
+			importFS(rule, ctx.ConfigPath, orm)
 		}
 	}
 
