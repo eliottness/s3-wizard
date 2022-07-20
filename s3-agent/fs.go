@@ -180,7 +180,7 @@ func (fs *S3FS) Create(fh *S3File) error {
 		return nil
 	}
 
-    fs.orm.batch = append(fs.orm.batch, fs.orm.GetNewEntry(fs.mountPath, fh.Path, stat.Size()))
+	fs.orm.batch = append(fs.orm.batch, fs.orm.GetNewEntry(fs.mountPath, fh.Path, stat.Size()))
 	return fs.RegisterFH(fh)
 }
 
@@ -199,7 +199,7 @@ func (fs *S3FS) Download(path string) error {
 		return nil
 	}
 
-	entry := fs.orm.GetEntry(fs.mountPath, path)
+	entry := fs.orm.GetOrCreateEntry(fs.mountPath, path, 0)
 
 	// The file does not need to be tracked or the file is local
 	if entry == nil || entry.Local {
@@ -241,7 +241,7 @@ func (fs *S3FS) GetSize(path string) (int64, error) {
 		return stat.Size(), nil
 	}
 
-	entry := fs.orm.GetEntry(fs.mountPath, path)
+	entry := fs.orm.GetOrCreateEntry(fs.mountPath, path, 0)
 
 	// The file does not need to be tracked or the file is local
 	if entry == nil || entry.Local {

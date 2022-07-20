@@ -46,7 +46,7 @@ func (s *S3Sender) Cycle() {
 
 	s.logger.Println("Running SEND Cycle")
 
-    s.fs.orm.db.Create(s.fs.orm.batch)
+	s.fs.orm.db.Create(s.fs.orm.batch)
 
 	var entries []S3NodeTable
 	s.orm.db.Model(&S3NodeTable{}).Where("Local = ?", true).Preload("S3RuleTable").Find(&entries)

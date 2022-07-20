@@ -54,25 +54,18 @@ func NewSQlite(config *ConfigPath) *SQlite {
 }
 
 func (orm *SQlite) GetNewEntry(rulePath, path string, size int64) *S3NodeTable {
-    return &S3NodeTable{
-        Path:            path,
-        Size:            size,
-        Local:           true,
-        UUID:            uuid.New().String(),
-        Server:          "",
-        S3RuleTablePath: rulePath,
-    }
+	return &S3NodeTable{
+		Path:            path,
+		Size:            size,
+		Local:           true,
+		UUID:            uuid.New().String(),
+		Server:          "",
+		S3RuleTablePath: rulePath,
+	}
 }
 
 /// Returns a file entry from the database
-func (orm *SQlite) GetEntry(rulePath, path string) *S3NodeTable {
-	entry := orm.GetNewEntry(rulePath, path, 0)
-	orm.db.Where("Path = ?", path).Preload("S3RuleTable").FirstOrCreate(entry)
-	return entry
-}
-
-/// Adds a file entry to the database
-func (orm *SQlite) NewEntry(rulePath, path string, size int64) *S3NodeTable {
+func (orm *SQlite) GetOrCreateEntry(rulePath, path string, size int64) *S3NodeTable {
 	entry := orm.GetNewEntry(rulePath, path, size)
 	orm.db.Where("Path = ?", path).Preload("S3RuleTable").FirstOrCreate(entry)
 	return entry
