@@ -32,7 +32,7 @@ type S3FS struct {
 	done   chan bool
 }
 
-func NewS3FS(loopbackPath, mountPath string, config *ConfigPath) *S3FS {
+func NewS3FS(loopbackPath, mountPath string, config *ConfigPath, orm *SQlite) *S3FS {
 	return &S3FS{
 		loopbackPath: loopbackPath,
 		mountPath:    mountPath,
@@ -41,7 +41,7 @@ func NewS3FS(loopbackPath, mountPath string, config *ConfigPath) *S3FS {
 		config:       config,
 		rclone:       NewRClone(config),
 		done:         make(chan bool),
-		orm:          NewSQlite(config),
+		orm:          orm,
 	}
 }
 
