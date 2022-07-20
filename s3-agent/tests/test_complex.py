@@ -16,8 +16,8 @@ class TestS3AgentClassComplex:
         first_content = 'Hello world first'
         second_content = 'Hello world second'
 
-        create_file(first_file_path, first_content, agent=False)
-        create_file(second_file_path, second_content, agent=False)
+        create_file(first_file_path, first_content)
+        create_file(second_file_path, second_content)
 
         ### WHEN ###
         process, connection = start_agent('tests/data/simple_config.json', reset_env=False)
@@ -40,8 +40,8 @@ class TestS3AgentClassComplex:
         first_content = 'Hello world first'
         second_content = 'Hello world second'
 
-        create_file(first_file_path, first_content, agent=False)
-        create_file(second_file_path, second_content, agent=False)
+        create_file(first_file_path, first_content)
+        create_file(second_file_path, second_content)
 
         ### WHEN ###
         time.sleep(2)

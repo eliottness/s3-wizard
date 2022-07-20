@@ -65,9 +65,20 @@ func (orm *SQlite) GetNewEntry(rulePath, path string, size int64) *S3NodeTable {
 }
 
 /// Returns a file entry from the database
-func (orm *SQlite) GetOrCreateEntry(rulePath, path string, size int64) *S3NodeTable {
+func (orm *SQlite) CreateEntry(rulePath, path string, size int64) *S3NodeTable {
 	entry := orm.GetNewEntry(rulePath, path, size)
-	orm.db.Where("Path = ?", path).Preload("S3RuleTable").FirstOrCreate(entry)
+	if result := orm.db.Where("Path = ?", path).Preload("S3RuleTable").FirstOrCreate(entry); result.Error != nil {
+		return nil
+	}
+	return entry
+}
+
+/// Returns a file entry from the database
+func (orm *SQlite) GetEntry(rulePath, path string, size int64) *S3NodeTable {
+	entry := orm.GetNewEntry(rulePath, path, size)
+	if result := orm.db.Where("Path = ?", path).Preload("S3RuleTable").First(entry); result.Error != nil {
+		return nil
+	}
 	return entry
 }
 

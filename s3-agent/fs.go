@@ -106,14 +106,14 @@ func (fs *S3FS) Stop() error {
 	return err
 }
 
-// We have 7 Hooks on the Fuse calls
-// 1. Rename        -> Rename entry in the DB
-// 2. Unlink        -> Remove entry from the DB + if remote, remove the file from the S3
-// 3. Download      -> The user needs the bytes in the file
-// 4. GetSize       -> We need the replace the size of the file with the one from the S3
-// 5. Create        -> Create a new file in the DB and register the file handler
-// 6. RegisterFH    -> Register the file handle to the list of file handle related to the file
-// 7. UnregisterFH  -> Unregister the file handle
+/// We have 7 Hooks on the Fuse calls
+/// 1. Rename        -> Rename entry in the DB
+/// 2. Unlink        -> Remove entry from the DB + if remote, remove the file from the S3
+/// 3. Download      -> The user needs the bytes in the file
+/// 4. GetSize       -> We need the replace the size of the file with the one from the S3
+/// 5. Create        -> Create a new file in the DB and register the file handler
+/// 6. RegisterFH    -> Register the file handle to the list of file handle related to the file
+/// 7. UnregisterFH  -> Unregister the file handle
 
 /// Rename entry in the DB
 func (fs *S3FS) Rename(oldPath, newPath string) error {
@@ -199,7 +199,7 @@ func (fs *S3FS) Download(path string) error {
 		return nil
 	}
 
-	entry := fs.orm.GetOrCreateEntry(fs.mountPath, path, 0)
+	entry := fs.orm.GetEntry(fs.mountPath, path, 0)
 
 	// The file does not need to be tracked or the file is local
 	if entry == nil || entry.Local {
@@ -214,13 +214,8 @@ func (fs *S3FS) Download(path string) error {
 		fs.logger.Println("Error while downloading the file", err)
 		return err
 	}
-	// Maybe flock the file but not sure if rclone will work as it will be a child process
 
-	// // Replace all file descriptor by the new ones
-	// if err := fs.reloadFds(path); err != nil {
-	// 	fs.logger.Printf("Error reloading file descriptors: %v", err)
-	// 	return err
-	// }
+	// Maybe flock the file but not sure if rclone will work as it will be a child process
 
 	fs.orm.RetriveFromServer(entry)
 
@@ -241,7 +236,7 @@ func (fs *S3FS) GetSize(path string) (int64, error) {
 		return stat.Size(), nil
 	}
 
-	entry := fs.orm.GetOrCreateEntry(fs.mountPath, path, 0)
+	entry := fs.orm.GetEntry(fs.mountPath, path, 0)
 
 	// The file does not need to be tracked or the file is local
 	if entry == nil || entry.Local {

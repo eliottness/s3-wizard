@@ -155,7 +155,7 @@ func importFile(oldPath, newPath string, info os.FileInfo, rule Rule, orm *SQlit
 
 	// Update the DB with the new entry
 	if len(entries) == 0 {
-		entry = orm.GetOrCreateEntry(rule.Src, newPath, info.Size())
+		entry = orm.CreateEntry(rule.Src, newPath, info.Size())
 	} else {
 		entry = &entries[0]
 		orm.db.Model(&entry).Where("Path = ?", oldPath).Preload("S3RuleTable").Update("Path", entry.Path)
