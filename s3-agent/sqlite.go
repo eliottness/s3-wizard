@@ -3,10 +3,12 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 /// The database table for the file entries
@@ -35,8 +37,17 @@ type SQlite struct {
 }
 
 func NewSQlite(config *ConfigPath) *SQlite {
+	// Personalize default db logger to ignore RecordNotFound error
+	db, err := gorm.Open(sqlite.Open(config.GetDBPath()), &gorm.Config{
+		Logger: logger.New(log.New(os.Stdout, "\r\n", log.LstdFlags),
+			logger.Config{
+				SlowThreshold:             200 * time.Millisecond,
+				LogLevel:                  logger.Warn,
+				IgnoreRecordNotFoundError: true,
+				Colorful:                  true,
+			}),
+	})
 
-	db, err := gorm.Open(sqlite.Open(config.GetDBPath()), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}
