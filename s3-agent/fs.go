@@ -180,7 +180,7 @@ func (fs *S3FS) Create(fh *S3File) error {
 		return nil
 	}
 
-	fs.orm.NewEntry(fs.mountPath, fh.Path, stat.Size())
+    fs.orm.batch = append(fs.orm.batch, fs.orm.GetNewEntry(fs.mountPath, fh.Path, stat.Size()))
 	return fs.RegisterFH(fh)
 }
 

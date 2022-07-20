@@ -31,6 +31,7 @@ type SQlite struct {
 	db     *gorm.DB
 	logger *log.Logger
 	config *ConfigPath
+	batch  []*S3NodeTable
 }
 
 func NewSQlite(config *ConfigPath) *SQlite {
@@ -48,36 +49,33 @@ func NewSQlite(config *ConfigPath) *SQlite {
 		db:     db,
 		logger: config.NewLogger("SQLITE: "),
 		config: config,
+		batch:  make([]*S3NodeTable, 0),
 	}
+}
+
+func (orm *SQlite) GetNewEntry(rulePath, path string, size int64) *S3NodeTable {
+    return &S3NodeTable{
+        Path:            path,
+        Size:            size,
+        Local:           true,
+        UUID:            uuid.New().String(),
+        Server:          "",
+        S3RuleTablePath: rulePath,
+    }
 }
 
 /// Returns a file entry from the database
 func (orm *SQlite) GetEntry(rulePath, path string) *S3NodeTable {
-	entry := S3NodeTable{
-		Path:            path,
-		Size:            0,
-		Local:           true,
-		UUID:            uuid.New().String(),
-		Server:          "",
-		S3RuleTablePath: rulePath,
-	}
-	orm.db.Where("Path = ?", path).Preload("S3RuleTable").FirstOrCreate(&entry)
-	return &entry
+	entry := orm.GetNewEntry(rulePath, path, 0)
+	orm.db.Where("Path = ?", path).Preload("S3RuleTable").FirstOrCreate(entry)
+	return entry
 }
 
 /// Adds a file entry to the database
 func (orm *SQlite) NewEntry(rulePath, path string, size int64) *S3NodeTable {
-	entry := S3NodeTable{
-		Path:            path,
-		Size:            size,
-		Local:           true,
-		UUID:            uuid.New().String(),
-		Server:          "",
-		S3RuleTablePath: rulePath,
-	}
-
-	orm.db.Where("Path = ?", path).Preload("S3RuleTable").FirstOrCreate(&entry)
-	return &entry
+	entry := orm.GetNewEntry(rulePath, path, size)
+	orm.db.Where("Path = ?", path).Preload("S3RuleTable").FirstOrCreate(entry)
+	return entry
 }
 
 /// Tell the DB that the file is remote now
