@@ -73,11 +73,9 @@ class TestS3AgentClassComplex:
         create_file(second_file_path, second_content)
 
         ### WHEN ###
-        stop_agent(process, connection, reset_env=False)
+        stop_agent(process, reset_env=False)
 
         ### THEN ###
-        connection = sqlite3.connect(os.path.join(S3_AGENT_PATH, 'sqlite.db'))
-
         rule_uuid = get_rule_entry(connection.cursor())[0]
         assert_entry_state(connection.cursor(), first_file_path, len(first_content), 0, 'remote')
         assert_entry_state(connection.cursor(), second_file_path, 0, 1, '')
