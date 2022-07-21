@@ -13,9 +13,9 @@ S3_AGENT_PATH = "./config"
 def run_command(cmd, stdout=None, stderr=None, code=None):
     process = subprocess.run(cmd.split(' '), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
     result = process.returncode, process.stdout.decode(), process.stderr.decode()
-    assert True if code   is None else result[0] == code,   result
-    assert True if stdout is None else result[1] == stdout, result
-    assert True if stderr is None else result[2] == stderr, result
+    assert True if code is None else result[0] == code, result
+    assert True if stdout is None else result[1] != "" if stdout is True else stdout in result[1], result
+    assert True if stderr is None else result[2] != "" if stderr is True else stderr in result[2], result
 
 
 def start_agent(config_path, reset_env=True):
@@ -67,13 +67,12 @@ def get_node_entry(cursor, filename):
     return cursor.fetchone()
 
 
-def assert_rclone_file(cursor, file_path):
-    rule_entry = get_rule_entry(cursor)
-    s3_file_path = os.path.join("remote:bucket-test/s3-agent", rule_entry[0], file_path)
+def assert_rclone_file(file_path):
+    s3_file_path = os.path.join("remote:bucket-test/s3-agent")
     rclone_config_path = os.path.join(S3_AGENT_PATH, 'rclone.conf.tmp')
-    cmd = f'./rclone --config {rclone_config_path} lsf {s3_file_path}'
-    expected = os.path.basename(os.path.normpath(file_path)) + '\n'
-    run_command(cmd, stdout=expected, stderr='', code=0)
+    file_name = os.path.basename(os.path.normpath(file_path))
+    cmd = f'./rclone --config {rclone_config_path} lsf {s3_file_path} --include "{file_name}"'
+    run_command(cmd, stdout=True, stderr='', code=0)
 
 
 def assert_entry_state(cursor, filename, size, Local, server):
@@ -85,7 +84,7 @@ def assert_entry_state(cursor, filename, size, Local, server):
 
 
 def assert_agent_file(cursor, file_path, content):
-    assert_rclone_file(cursor, file_path)
+    assert_rclone_file(file_path)
     assert_entry_state(cursor, file_path, len(content), 0, 'remote')
 
     with open(f'{FILESYSTEM_PATH}/{file_path}') as file:

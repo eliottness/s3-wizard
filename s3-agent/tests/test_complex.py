@@ -1,9 +1,10 @@
 import os
 import pytest
 import sqlite3
+import subprocess
 import time
 
-from .utils import create_file, assert_agent_file, start_agent, stop_agent, run_command, get_rule_entry, assert_entry_state, S3_AGENT_PATH, FILESYSTEM_PATH
+from .utils import assert_rclone_file, create_file, assert_agent_file, start_agent, stop_agent, run_command, get_rule_entry, assert_entry_state, S3_AGENT_PATH, FILESYSTEM_PATH
 
 
 @pytest.mark.usefixtures('handle_server')
@@ -58,7 +59,7 @@ class TestS3AgentClassComplex:
         stop_agent(process, connection)
 
 
-    def test_rebuild(self):
+    def test_rebuild_mode(self):
         ### GIVEN ###
         process, connection = start_agent('tests/data/simple_config.json')
 
@@ -91,4 +92,37 @@ class TestS3AgentClassComplex:
 
         # Reset testing environment
         connection.close()
+        run_command(f'rm -rf {S3_AGENT_PATH} {FILESYSTEM_PATH}', code=0)
+
+
+    def test_direct_mode(self):
+        ### GIVEN ###
+
+        # Reset env if necessary
+        run_command(f'rm -rf {S3_AGENT_PATH} {FILESYSTEM_PATH}', code=0)
+
+        # Set config then run s3-agent in direct mode
+        config_path = 'tests/data/simple_config.json'
+        run_command(f'./s3-agent --config-folder={S3_AGENT_PATH} config import {config_path}', code=0)
+        process = subprocess.Popen(f'./s3-agent --config-folder={S3_AGENT_PATH} direct'.split(' '))
+
+        ### WHEN ###
+
+        first_file_path = 'test_simple_file.txt'
+        second_file_path = 'folder/test_simple_file.txt'
+        first_content = 'Hello world first'
+        second_content = 'Hello world second'
+
+        create_file(first_file_path, first_content)
+        create_file(second_file_path, second_content)
+
+        time.sleep(2)
+
+        ### THEN ###
+
+        assert_rclone_file(first_file_path)
+        assert_rclone_file(second_file_path)
+
+        process.send_signal(subprocess.signal.SIGTERM)
+        process.wait()
         run_command(f'rm -rf {S3_AGENT_PATH} {FILESYSTEM_PATH}', code=0)
