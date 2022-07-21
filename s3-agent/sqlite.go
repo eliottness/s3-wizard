@@ -41,7 +41,7 @@ func NewSQlite(config *ConfigPath) *SQlite {
 	db, err := gorm.Open(sqlite.Open(config.GetDBPath()), &gorm.Config{
 		Logger: logger.New(log.New(os.Stdout, "\r\n", log.LstdFlags),
 			logger.Config{
-				SlowThreshold:             200 * time.Millisecond,
+				SlowThreshold:             400 * time.Millisecond,
 				LogLevel:                  logger.Warn,
 				IgnoreRecordNotFoundError: true,
 				Colorful:                  true,
@@ -131,4 +131,16 @@ func (orm *SQlite) AddIfNotExistsRule(path string) *S3RuleTable {
 	}
 	orm.db.Where("Path = ?", path).FirstOrCreate(&rule)
 	return &rule
+}
+
+func (orm *SQlite) AddOrUpdateRule(path, uuid string) {
+	rule := S3RuleTable{
+		Path: path,
+		UUID: uuid,
+	}
+
+	// Try to update the rule, if it doesn't exist, create it
+	if orm.db.Model(&rule).Where("Path = ?", path).Updates(&rule).RowsAffected == 0 {
+		orm.db.Where("Path = ?", path).Create(&rule)
+	}
 }

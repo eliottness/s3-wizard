@@ -1,8 +1,9 @@
 import os
 import pytest
+import sqlite3
 import time
 
-from .utils import create_file, assert_agent_file, start_agent, stop_agent, FILESYSTEM_PATH
+from .utils import create_file, assert_agent_file, start_agent, stop_agent, run_command, get_rule_entry, assert_entry_state, S3_AGENT_PATH, FILESYSTEM_PATH
 
 
 @pytest.mark.usefixtures('handle_server')
@@ -55,3 +56,33 @@ class TestS3AgentClassComplex:
 
         # Reset testing environment
         stop_agent(process, connection)
+
+
+    def test_rebuild(self):
+        ### GIVEN ###
+        process, connection = start_agent('tests/data/simple_config.json')
+
+        first_file_path = 'test_simple_file.txt'
+        second_file_path = 'folder/test_simple_file.txt'
+        first_content = 'Hello world first'
+        second_content = 'Hello world second'
+
+        create_file(first_file_path, first_content)
+        time.sleep(2)
+        create_file(second_file_path, second_content)
+
+        ### WHEN ###
+        rule_uuid = get_rule_entry(connection.cursor())[0]
+        stop_agent(process, connection, reset_env=False)
+
+        run_command(f'rm {os.path.join(S3_AGENT_PATH, "sqlite.db")}', code=0)
+        run_command(f'./s3-agent --config-folder={S3_AGENT_PATH} rebuild {rule_uuid} 0', code=0)
+
+        ### THEN ###
+        connection = sqlite3.connect(os.path.join(S3_AGENT_PATH, 'sqlite.db'))
+        assert_entry_state(connection.cursor(), second_file_path, len(second_content), 1, '')
+        assert_entry_state(connection.cursor(), first_file_path, len(first_content), 0, 'remote')
+
+        # Reset testing environment
+        connection.close()
+        run_command(f'rm -rf {S3_AGENT_PATH} {FILESYSTEM_PATH}', code=0)

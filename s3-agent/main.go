@@ -22,9 +22,6 @@ type Context struct {
 type SyncCmd struct{}
 
 func (cmd *SyncCmd) Run(ctx *Context) error {
-
-	doSelfUpdate()
-
 	config, err := LoadConfig(ctx.ConfigPath.GetAgentConfigPath())
 	if err != nil {
 		log.Println("Cannot load config", err)
@@ -32,6 +29,7 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 	}
 
 	if err = ctx.ConfigPath.WriteRCloneConfig(config.RCloneConfig); err != nil {
+		log.Println("Cannot write rclone config", err)
 		return err
 	}
 
@@ -43,6 +41,7 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 	if _, err := os.Stat(rule.Src); err == nil {
 
 		if err := importFS(rule, ctx.ConfigPath, orm); err != nil {
+			log.Println("Error while importing existing files: ", err)
 			return err
 		}
 
@@ -70,6 +69,59 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 	fs.WaitStop()
 
 	cron.Stop()
+	return nil
+}
+
+type RebuildDbCmd struct {
+	UUID       string `arg:"" help:"UUID of the rule to be used to rebuild the database"`
+	RuleNumber int    `arg:"" help:"Number of the rule to rebuild"`
+}
+
+func (cmd *RebuildDbCmd) Run(ctx *Context) error {
+	config, err := LoadConfig(ctx.ConfigPath.GetAgentConfigPath())
+	if err != nil {
+		log.Println("Cannot load config", err)
+		return err
+	}
+
+	if err = ctx.ConfigPath.WriteRCloneConfig(config.RCloneConfig); err != nil {
+		log.Println("Cannot write rclone config", err)
+		return err
+	}
+
+	if cmd.RuleNumber < 0 || cmd.RuleNumber >= len(config.Rules) {
+		return fmt.Errorf("Invalid Rule number: %d", cmd.RuleNumber)
+	}
+
+	log.Println("Starting DB rebuild process ...")
+
+	rule := config.Rules[cmd.RuleNumber]
+	rclone := NewRClone(ctx.ConfigPath)
+	orm := NewSQlite(ctx.ConfigPath)
+	orm.AddOrUpdateRule(rule.Src, cmd.UUID)
+
+	ruleFolder := ctx.ConfigPath.GetLoopbackFSPath(cmd.UUID)
+
+	filepath.Walk(ruleFolder, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !info.IsDir() {
+			log.Println("Handling file: ", path)
+			entry := orm.CreateEntry(cmd.UUID, path, info.Size())
+			if entry.Size == 0 {
+				if size, err := rclone.GetSize(entry, rule.Dest); err == nil && size > 0 {
+					orm.SendToServer(entry, rule.Dest, size)
+				}
+			}
+		}
+
+		return nil
+	})
+
+	log.Println("Finished DB rebuild process ...")
+
 	return nil
 }
 
@@ -157,11 +209,12 @@ func (cmd *ImportConfigCmd) Run(ctx *Context) error {
 }
 
 type CLI struct {
-	Debug        bool        `help:"Enable debug mode."`
-	ConfigFolder string      `help:"Path to the agent config folder."`
-	Sync         SyncCmd     `cmd:"" name:"sync" help:"Run the sync daemon."`
-	TestRule     TestRuleCmd `cmd:"" name:"test-rule" help:"Test a rule on a file."`
-	Config       ConfigCmd   `cmd:"" name:"config" help:"Manage the config."`
+	Debug        bool         `help:"Enable debug mode."`
+	ConfigFolder string       `help:"Path to the agent config folder."`
+	Sync         SyncCmd      `cmd:"" name:"sync" help:"Run the sync daemon."`
+	Rebuild      RebuildDbCmd `cmd:"" name:"rebuild" help:"Rebuild the internal Postgres DB."`
+	TestRule     TestRuleCmd  `cmd:"" name:"test-rule" help:"Test a rule on a file."`
+	Config       ConfigCmd    `cmd:"" name:"config" help:"Manage the config."`
 }
 
 func doSelfUpdate() {
@@ -185,6 +238,7 @@ func doSelfUpdate() {
 }
 
 func main() {
+	doSelfUpdate()
 	cli := &CLI{
 		Debug:        false,
 		ConfigFolder: "",
