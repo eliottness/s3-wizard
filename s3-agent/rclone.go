@@ -51,6 +51,7 @@ func NewRClone(configPath *ConfigPath) *RClone {
 func (r *RClone) Run(opts ...subprocess.Option) (int, string, string, error) {
 
 	opts = append(opts, subprocess.Args("--config", r.configPath.GetRCloneConfigPath()))
+	opts = append(opts, subprocess.Shell, subprocess.HideStdout, subprocess.HideStderr)
 	pop := subprocess.New(r.configPath.GetRCloneBinaryPath(), opts...)
 
 	if err := pop.Exec(); err != nil {
@@ -139,20 +140,15 @@ func (r *RClone) Remove(entry *S3NodeTable) error {
 	return nil
 }
 
-func (r *RClone) GetSize(entry *S3NodeTable) (int64, error) {
-	if entry.Local {
-		r.logger.Println("Warning: Asking RClone to remove a local file")
-		return -1, nil
-	}
-
-	s3Path, err := r.getS3Path(entry.Server, entry.S3RuleTable.UUID, entry.Path)
+func (r *RClone) GetSize(entry *S3NodeTable, server string) (int64, error) {
+	s3Path, err := r.getS3Path(server, entry.S3RuleTable.UUID, entry.Path)
 	if err != nil {
 		return -1, err
 	}
 
 	ret, stdout, stderr, err := r.Run(subprocess.Args("size", s3Path))
 	if ret != 0 {
-		r.logger.Printf("Rclone remove failed with exit code: %d\n%s", ret, stderr)
+		r.logger.Printf("Rclone size failed with exit code: %d\n%s", ret, stderr)
 		return -1, err
 	}
 
@@ -162,7 +158,7 @@ func (r *RClone) GetSize(entry *S3NodeTable) (int64, error) {
 		return -1, fmt.Errorf("Could not find size in output: %s", stdout)
 	}
 
-	size, err := strconv.ParseInt(match[1], 10, 64)
+	size, err := strconv.ParseInt(match[2], 10, 64)
 	if err != nil {
 		return -1, err
 	}

@@ -93,6 +93,8 @@ func (cmd *RebuildDbCmd) Run(ctx *Context) error {
 		return fmt.Errorf("Invalid Rule number: %d", cmd.RuleNumber)
 	}
 
+	log.Println("Starting DB rebuild process ...")
+
 	rule := config.Rules[cmd.RuleNumber]
 	rclone := NewRClone(ctx.ConfigPath)
 	orm := NewSQlite(ctx.ConfigPath)
@@ -106,9 +108,10 @@ func (cmd *RebuildDbCmd) Run(ctx *Context) error {
 		}
 
 		if !info.IsDir() {
+			log.Println("Handling file: ", path)
 			entry := orm.CreateEntry(cmd.UUID, path, info.Size())
 			if entry.Size == 0 {
-				if size, err := rclone.GetSize(entry); err == nil && size > 0 {
+				if size, err := rclone.GetSize(entry, rule.Dest); err == nil && size > 0 {
 					orm.SendToServer(entry, rule.Dest, size)
 				}
 			}
@@ -116,6 +119,8 @@ func (cmd *RebuildDbCmd) Run(ctx *Context) error {
 
 		return nil
 	})
+
+	log.Println("Finished DB rebuild process ...")
 
 	return nil
 }
