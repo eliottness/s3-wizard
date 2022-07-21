@@ -165,3 +165,16 @@ func (r *RClone) GetSize(entry *S3NodeTable, server string) (int64, error) {
 
 	return size, nil
 }
+
+func (r *RClone) Sync(server, uuid, src string) error {
+	bucket := r.config.RCloneConfig[server]["bucket"]
+	s3Path := server + ":" + filepath.Join(bucket, "s3-agent", uuid)
+
+	ret, _, stderr, err := r.Run(subprocess.Args("sync", src, s3Path))
+	if ret != 0 {
+		r.logger.Printf("Rclone sync failed with exit code: %d\n%s", ret, stderr)
+		return err
+	}
+
+	return nil
+}
