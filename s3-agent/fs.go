@@ -336,6 +336,12 @@ func (fs *S3FS) catchSignals() {
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		sig := <-sigs
+
+		if len(fs.orm.batch) > 0 {
+			fs.logger.Printf("Registering %v unsaved entries\n", len(fs.orm.batch))
+			fs.orm.db.Create(&fs.orm.batch)
+		}
+
 		fs.logger.Printf("Unmounting: %v (Signal: %v)\n", fs.mountPath, sig)
 		if err := fs.Stop(); err != nil {
 			fs.logger.Printf("Error while unmounting: %v\n", fs.mountPath)
