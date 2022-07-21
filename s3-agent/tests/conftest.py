@@ -23,5 +23,6 @@ def handle_agent(request):
     yield connection.cursor()
 
     ### TEARDOWN ###
-    stop_agent(process, connection)
-    run_command(f'rm -rf {S3_AGENT_PATH}', code=0)
+    stop_agent(process, connection, not DEBUG)
+    if not DEBUG:
+        run_command(f'rm -rf {S3_AGENT_PATH}', code=0)

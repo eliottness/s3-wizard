@@ -13,13 +13,12 @@ S3_AGENT_PATH = "./config"
 def run_command(cmd, stdout=None, stderr=None, code=None):
     process = subprocess.run(cmd.split(' '), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
     result = process.returncode, process.stdout.decode(), process.stderr.decode()
-    assert True if code   is None else result[0] == code,   result
-    assert True if stdout is None else result[1] == stdout, result
-    assert True if stderr is None else result[2] == stderr, result
+    assert True if code is None else result[0] == code, result
+    assert True if stdout is None else result[1] != "" if stdout is True else result[1] == stdout, result
+    assert True if stderr is None else result[2] != "" if stderr is True else result[2] == stderr, result
 
 
 def start_agent(config_path, reset_env=True):
-    # Reset env if necessary
     if reset_env:
         run_command(f'rm -rf {S3_AGENT_PATH} {FILESYSTEM_PATH}', code=0)
 
@@ -38,12 +37,14 @@ def start_agent(config_path, reset_env=True):
     return process, connection
 
 
-def stop_agent(process, connection, reset_env=True):
-    connection.close()
-    process.send_signal(subprocess.signal.SIGTERM)
-    process.wait()
+def stop_agent(process=None, connection=None, reset_env=True):
+    if connection is not None:
+        connection.close()
 
-    # Reset env if necessary
+    if process is not None:
+        process.send_signal(subprocess.signal.SIGTERM)
+        process.wait()
+
     if reset_env:
         run_command(f'rm -rf {S3_AGENT_PATH} {FILESYSTEM_PATH}', code=0)
 
@@ -62,18 +63,16 @@ def get_rule_entry(cursor):
 
 def get_node_entry(cursor, filename):
     path = os.path.join(S3_AGENT_PATH[2:], get_rule_entry(cursor)[0], filename)
-    print(path)
     cursor.execute(f"SELECT * FROM s3_node_tables WHERE path = '{path}'")
     return cursor.fetchone()
 
 
-def assert_rclone_file(cursor, file_path):
-    rule_entry = get_rule_entry(cursor)
-    s3_file_path = os.path.join("remote:bucket-test/s3-agent", rule_entry[0], file_path)
+def assert_rclone_file(file_path):
     rclone_config_path = os.path.join(S3_AGENT_PATH, 'rclone.conf.tmp')
-    cmd = f'./rclone --config {rclone_config_path} lsf {s3_file_path}'
-    expected = os.path.basename(os.path.normpath(file_path)) + '\n'
-    run_command(cmd, stdout=expected, stderr='', code=0)
+    s3_file_path = os.path.join("remote:bucket-test/s3-agent")
+    file_name = os.path.basename(os.path.normpath(file_path))
+    cmd = f'./rclone --config {rclone_config_path} lsf {s3_file_path} --include "{file_name}"'
+    run_command(cmd, stdout=True, stderr='', code=0)
 
 
 def assert_entry_state(cursor, filename, size, Local, server):
@@ -85,7 +84,7 @@ def assert_entry_state(cursor, filename, size, Local, server):
 
 
 def assert_agent_file(cursor, file_path, content):
-    assert_rclone_file(cursor, file_path)
+    assert_rclone_file(file_path)
     assert_entry_state(cursor, file_path, len(content), 0, 'remote')
 
     with open(f'{FILESYSTEM_PATH}/{file_path}') as file:

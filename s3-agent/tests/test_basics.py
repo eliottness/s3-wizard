@@ -1,8 +1,7 @@
-import os
 import pytest
 import time
 
-from .utils import assert_agent_file, assert_rclone_file, assert_entry_state, FILESYSTEM_PATH, create_file
+from .utils import assert_agent_file, create_file
 
 
 @pytest.mark.usefixtures('handle_server')
