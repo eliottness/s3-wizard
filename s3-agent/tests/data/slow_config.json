@@ -1,0 +1,28 @@
+{
+    "rules": [
+        {
+            "src": "./tmp",
+            "dest": "remote",
+            "type": "OLDER_THAN",
+            "params": "3s",
+            "cron-sender": "@every 1s"
+        }
+    ],
+    "servers": ["remote"],
+    "exclude-patterns": [],
+    "rclone-config": {
+        "remote": {
+            "type": "s3",
+            "provider": "Minio",
+            "env_auth": "false",
+            "access_key_id": "minioadmin",
+            "secret_access_key": "minioadmin",
+            "endpoint": "http://localhost:9000",
+            "no_head": "true",
+            "region": "eu-west-3",
+            "location_constraint": "eu-west-3",
+            "acl": "public-read-write",
+            "bucket": "bucket-test"
+        }
+    }
+}

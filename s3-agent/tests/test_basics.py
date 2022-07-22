@@ -11,7 +11,7 @@ class TestS3AgentClassBasic:
 
     def test_simple_file(self, handle_agent):
         ### GIVEN ###
-        file_path = 'test_simple_file.txt'
+        file_path = 'simple_file.txt'
         content = 'Hello world'
 
         create_file(file_path, content)
@@ -25,7 +25,7 @@ class TestS3AgentClassBasic:
 
     def test_simple_folder(self, handle_agent):
         ### GIVEN ###
-        file_path = 'test_simple_folder/test_simple_file.txt'
+        file_path = 'simple_folder/simple_folder_file.txt'
         content = 'Hello world'
 
         create_file(file_path, content)
@@ -39,7 +39,7 @@ class TestS3AgentClassBasic:
 
     def test_subfolder(self, handle_agent):
         ### GIVEN ###
-        file_path = 'folder/subfolder/test_simple_file.txt'
+        file_path = 'folder/subfolder/subfolder_file.txt'
         content = 'Hello world'
 
         create_file(file_path, content)
@@ -53,8 +53,8 @@ class TestS3AgentClassBasic:
 
     def test_same_name_files(self, handle_agent):
         ### GIVEN ###
-        first_file_path = 'test_simple_file.txt'
-        second_file_path = 'folder/test_simple_file.txt'
+        first_file_path = 'same_file.txt'
+        second_file_path = 'folder/same_file.txt'
         first_content = 'Hello world first'
         second_content = 'Hello world second'
 

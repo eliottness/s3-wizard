@@ -80,24 +80,43 @@ func (r *RClone) getS3Path(server, ruleId, fromPath string) (string, error) {
 	return server + ":" + serverPath, nil
 }
 
-func (r *RClone) Send(server, fromPath string, entry *S3NodeTable) error {
-	if !entry.Local {
-		r.logger.Println("Warning: Asking RClone to send a remote file")
-		return nil
-	}
-
-	s3Path, err := r.getS3Path(server, entry.S3RuleTable.UUID, fromPath)
+func (r *RClone) CopyTo(server, uuid, fromPath string) error {
+	s3Path, err := r.getS3Path(server, uuid, fromPath)
 	if err != nil {
 		return err
 	}
 
 	ret, _, stderr, err := r.Run(subprocess.Args("copyto", fromPath, s3Path))
 	if ret != 0 {
-		r.logger.Printf("Rclone send failed with exit code: %d\n%s", ret, stderr)
+		r.logger.Printf("Rclone copyto failed with exit code: %d\n%s", ret, stderr)
 		return err
 	}
 
 	return nil
+}
+
+func (r *RClone) Delete(server, uuid, path string) error {
+	s3Path, err := r.getS3Path(server, uuid, path)
+	if err != nil {
+		return err
+	}
+
+	ret, _, stderr, err := r.Run(subprocess.Args("delete", s3Path))
+	if ret != 0 {
+		r.logger.Printf("Rclone delete failed with exit code: %d\n%s", ret, stderr)
+		return err
+	}
+
+	return nil
+}
+
+func (r *RClone) Send(server, fromPath string, entry *S3NodeTable) error {
+	if !entry.Local {
+		r.logger.Println("Warning: Asking RClone to send a remote file")
+		return nil
+	}
+
+	return r.CopyTo(server, entry.S3RuleTable.UUID, fromPath)
 }
 
 func (r *RClone) Download(entry *S3NodeTable) error {
@@ -126,18 +145,7 @@ func (r *RClone) Remove(entry *S3NodeTable) error {
 		return nil
 	}
 
-	s3Path, err := r.getS3Path(entry.Server, entry.S3RuleTable.UUID, entry.Path)
-	if err != nil {
-		return err
-	}
-
-	ret, _, stderr, err := r.Run(subprocess.Args("deletefile", s3Path))
-	if ret != 0 {
-		r.logger.Printf("Rclone remove failed with exit code: %d\n%s", ret, stderr)
-		return err
-	}
-
-	return nil
+	return r.Delete(entry.Server, entry.S3RuleTable.UUID, entry.Path)
 }
 
 func (r *RClone) GetSize(entry *S3NodeTable, server string) (int64, error) {
@@ -164,17 +172,4 @@ func (r *RClone) GetSize(entry *S3NodeTable, server string) (int64, error) {
 	}
 
 	return size, nil
-}
-
-func (r *RClone) Sync(server, uuid, src string) error {
-	bucket := r.config.RCloneConfig[server]["bucket"]
-	s3Path := server + ":" + filepath.Join(bucket, "s3-agent", uuid)
-
-	ret, _, stderr, err := r.Run(subprocess.Args("sync", src, s3Path))
-	if ret != 0 {
-		r.logger.Printf("Rclone sync failed with exit code: %d\n%s", ret, stderr)
-		return err
-	}
-
-	return nil
 }

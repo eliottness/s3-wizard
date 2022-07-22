@@ -333,7 +333,7 @@ func (fs *S3FS) reloadFds(path string) error {
 
 func (fs *S3FS) catchSignals() {
 	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL, syscall.SIGQUIT)
 	go func() {
 		sig := <-sigs
 
