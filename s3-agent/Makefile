@@ -25,7 +25,7 @@ run: rclone
 	go run .
 
 test: build
-	pytest tests/
+	pytest tests/ -k '$(expr)'
 
 clean:
 	rm -rf s3-agent rclone tests/__pycache__ .pytest_cache

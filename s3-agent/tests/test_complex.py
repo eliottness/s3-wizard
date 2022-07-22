@@ -20,7 +20,7 @@ class TestS3AgentClassComplex:
         self.process = None
 
 
-    def test_import_folder(self):
+    def test_import_simple_folder(self):
         ### GIVEN ###
         first_file_path = 'import_file_1.txt'
         second_file_path = 'folder/import_file_2.txt'
@@ -37,6 +37,21 @@ class TestS3AgentClassComplex:
         ### THEN ###
         assert_agent_file(self.connection.cursor(), first_file_path, first_content)
         assert_agent_file(self.connection.cursor(), second_file_path, second_content)
+
+
+    def test_import_deep_folder(self):
+        ### GIVEN ###
+        file_path = 'folder1/folder2/deep_folder_file.txt'
+        content = 'Hello world'
+
+        create_file(file_path, content)
+
+        ### WHEN ###
+        self.process, self.connection = start_agent('tests/data/simple_config.json', reset_env=False)
+        time.sleep(3)
+
+        ### THEN ###
+        assert_agent_file(self.connection.cursor(), file_path, content)
 
 
     def test_restart(self):

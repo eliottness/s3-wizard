@@ -84,15 +84,16 @@ func createDirectories(dirPath, loopbackRoot, mountPath string) error {
 			continue
 		}
 
-		if err := createDirectories(nodePath, loopbackRoot, mountPath); err != nil {
-			return err
-		}
-
 		newPath := filepath.Join(loopbackRoot, nodePath[len(mountPath)-1:])
 		if err := os.Mkdir(newPath, node.Mode()); err != nil {
 			return err
 		}
+
+		if err := createDirectories(nodePath, loopbackRoot, mountPath); err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
 
@@ -117,6 +118,7 @@ func deleteDirectories(dirPath string) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
