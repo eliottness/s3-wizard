@@ -113,7 +113,6 @@ class TestS3AgentClassComplex:
         time.sleep(1)
 
         ### THEN ###
-
         assert_rclone_file(first_file_path)
         assert_rclone_file(second_file_path, False)
 

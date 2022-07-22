@@ -13,7 +13,6 @@ S3_AGENT_PATH = "./config"
 def run_command(cmd, stdout=None, stderr=None, code=None, presence=True):
     process = subprocess.run(cmd.split(' '), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
     result = process.returncode, process.stdout.decode(), process.stderr.decode()
-    print(presence)
     assert True if code is None else result[0] == code, result
     assert True if stdout is None else stdout in result[1] if presence else stdout not in result[1], result
     assert True if stderr is None else stderr in result[2] if presence else stderr not in result[2], result
