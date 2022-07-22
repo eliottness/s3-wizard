@@ -10,6 +10,15 @@ from .utils import assert_rclone_file, create_file, assert_agent_file, start_age
 @pytest.mark.usefixtures('handle_server')
 class TestS3AgentClassComplex:
 
+    process = None
+    connection = None
+
+
+    def teardown_method(self, test_method):
+        stop_agent(self.process, self.connection)
+        self.connection = None
+        self.process = None
+
 
     def test_import_folder(self):
         ### GIVEN ###
@@ -22,20 +31,17 @@ class TestS3AgentClassComplex:
         create_file(second_file_path, second_content)
 
         ### WHEN ###
-        process, connection = start_agent('tests/data/simple_config.json', reset_env=False)
-        time.sleep(2)
+        self.process, self.connection = start_agent('tests/data/simple_config.json', reset_env=False)
+        time.sleep(3)
 
         ### THEN ###
-        assert_agent_file(connection.cursor(), first_file_path, first_content)
-        assert_agent_file(connection.cursor(), second_file_path, second_content)
-
-        # Reset testing environment
-        stop_agent(process, connection)
+        assert_agent_file(self.connection.cursor(), first_file_path, first_content)
+        assert_agent_file(self.connection.cursor(), second_file_path, second_content)
 
 
     def test_restart(self):
         ### GIVEN ###
-        process, connection = start_agent('tests/data/simple_config.json')
+        self.process, self.connection = start_agent('tests/data/simple_config.json')
 
         first_file_path = 'restart_file_1.txt'
         second_file_path = 'folder/restart_file_2.txt'
@@ -47,21 +53,18 @@ class TestS3AgentClassComplex:
 
         ### WHEN ###
         time.sleep(2)
-        stop_agent(process, connection, reset_env=False)
-        process, connection = start_agent('tests/data/simple_config.json', reset_env=False)
+        stop_agent(self.process, self.connection, reset_env=False)
+        self.process, self.connection = start_agent('tests/data/simple_config.json', reset_env=False)
         time.sleep(2)
 
         ### THEN ###
-        assert_agent_file(connection.cursor(), first_file_path, first_content)
-        assert_agent_file(connection.cursor(), second_file_path, second_content)
-
-        # Reset testing environment
-        stop_agent(process, connection)
+        assert_agent_file(self.connection.cursor(), first_file_path, first_content)
+        assert_agent_file(self.connection.cursor(), second_file_path, second_content)
 
 
     def test_rebuild_mode(self):
         ### GIVEN ###
-        process, connection = start_agent('tests/data/simple_config.json')
+        self.process, self.connection = start_agent('tests/data/simple_config.json')
 
         first_file_path = 'rebuild_file_1.txt'
         second_file_path = 'folder/rebuild_file_2.txt'
@@ -73,33 +76,30 @@ class TestS3AgentClassComplex:
         create_file(second_file_path, second_content)
 
         ### WHEN ###
-        stop_agent(process, reset_env=False)
+        stop_agent(self.process, reset_env=False)
 
         ### THEN ###
-        rule_uuid = get_rule_entry(connection.cursor())[0]
-        assert_entry_state(connection.cursor(), first_file_path, len(first_content), 0, 'remote')
-        assert_entry_state(connection.cursor(), second_file_path, 0, 1, '')
+        rule_uuid = get_rule_entry(self.connection.cursor())[0]
+        assert_entry_state(self.connection.cursor(), first_file_path, len(first_content), 0, 'remote')
+        assert_entry_state(self.connection.cursor(), second_file_path, 0, 1, '')
 
-        connection.close()
+        self.connection.close()
 
         ### WHEN ###
         run_command(f'rm {os.path.join(S3_AGENT_PATH, "sqlite.db")}', code=0)
         run_command(f'./s3-agent --config-folder={S3_AGENT_PATH} rebuild {rule_uuid} 0', code=0)
 
         ### THEN ###
-        connection = sqlite3.connect(os.path.join(S3_AGENT_PATH, 'sqlite.db'))
-        assert_entry_state(connection.cursor(), first_file_path, len(first_content), 0, 'remote')
-        assert_entry_state(connection.cursor(), second_file_path, len(second_content), 1, '')
-
-        # Reset testing environment
-        stop_agent(connection=connection)
+        self.connection = sqlite3.connect(os.path.join(S3_AGENT_PATH, 'sqlite.db'))
+        assert_entry_state(self.connection.cursor(), first_file_path, len(first_content), 0, 'remote')
+        assert_entry_state(self.connection.cursor(), second_file_path, len(second_content), 1, '')
 
 
     def test_dry_run_mode(self):
         ### GIVEN ###
         config_path = 'tests/data/slow_config.json'
         run_command(f'./s3-agent --config-folder={S3_AGENT_PATH} config import {config_path}', code=0)
-        process = subprocess.Popen(f'./s3-agent --config-folder={S3_AGENT_PATH} dry-run'.split(' '))
+        self.process = subprocess.Popen(f'./s3-agent --config-folder={S3_AGENT_PATH} dry-run'.split(' '))
 
         ### WHEN ###
         first_file_path = 'dry_run_file_1.txt'
@@ -123,6 +123,3 @@ class TestS3AgentClassComplex:
 
         assert_rclone_file(first_file_path, False)
         assert_rclone_file(second_file_path)
-
-        # Reset testing environment
-        stop_agent(process)
