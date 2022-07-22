@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"path/filepath"
 	"regexp"
 	"syscall"
 )
@@ -15,6 +16,7 @@ type S3Sender struct {
 	stop            chan bool
 	logger          *log.Logger
 	orm             *SQlite
+	rclone          *RClone
 }
 
 func NewS3Sender(rule *Rule, fs *S3FS, excludePattern []string, config *ConfigPath, orm *SQlite) (*S3Sender, error) {
@@ -27,6 +29,7 @@ func NewS3Sender(rule *Rule, fs *S3FS, excludePattern []string, config *ConfigPa
 		stop:            make(chan bool),
 		logger:          config.NewLogger("SEND: " + rule.Src + " | "),
 		orm:             orm,
+		rclone:          NewRClone(config),
 	}
 
 	// Compile regexps
@@ -42,13 +45,44 @@ func NewS3Sender(rule *Rule, fs *S3FS, excludePattern []string, config *ConfigPa
 	return s, nil
 }
 
+func (s *S3Sender) DryRunCycle(uuid string) {
+
+	s.logger.Println("Running Dry Run SEND Cycle")
+
+	filepath.Walk(s.rule.Src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !info.IsDir() && !s.isPatternExcluded(path) {
+			if s.rule.MustBeRemote(path) {
+				s.logger.Printf("Sending file: %v -> %v", path, s.rule.Dest)
+
+				if err := s.rclone.CopyTo(s.rule.Dest, uuid, path); err != nil {
+					s.logger.Println("Error sending the file", err)
+					return err
+				}
+			} else {
+				s.logger.Printf("Trying to remove file: %v -> %v", path, s.rule.Dest)
+
+				if err := s.rclone.Delete(s.rule.Dest, uuid, path); err != nil {
+					s.logger.Println("Error deleting the file", err)
+					return err
+				}
+			}
+		}
+
+		return nil
+	})
+}
+
 func (s *S3Sender) Cycle() {
 
 	s.logger.Println("Running SEND Cycle")
 
-	if len(s.fs.orm.batch) > 0 {
-		s.fs.orm.db.Create(&s.fs.orm.batch)
-		s.fs.orm.batch = make([]*S3NodeTable, 0)
+	if len(s.orm.batch) > 0 {
+		s.orm.db.Create(&s.orm.batch)
+		s.orm.batch = make([]*S3NodeTable, 0)
 	}
 
 	var entries []S3NodeTable
@@ -89,7 +123,7 @@ func (s *S3Sender) SendRemote(entry *S3NodeTable) error {
 		return err
 	}
 
-	if err := s.fs.rclone.Send(s.rule.Dest, entry.Path, entry); err != nil {
+	if err := s.rclone.Send(s.rule.Dest, entry.Path, entry); err != nil {
 		s.logger.Println("Error sending the file", err)
 		return err
 	}
@@ -100,12 +134,6 @@ func (s *S3Sender) SendRemote(entry *S3NodeTable) error {
 		s.logger.Println("Error truncating the file locally", err)
 		return err
 	}
-
-	// // Replace all file descriptor by the new ones
-	// if err := s.fs.reloadFds(entry.Path); err != nil {
-	// 	s.logger.Println("Error reloading file descriptors", err)
-	// 	return err
-	// }
 
 	return nil
 }

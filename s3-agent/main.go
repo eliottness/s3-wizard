@@ -76,9 +76,9 @@ func (cmd *SyncCmd) Run(ctx *Context) error {
 	return nil
 }
 
-type DirectCmd struct{}
+type DryRunCmd struct{}
 
-func (cmd *DirectCmd) Run(ctx *Context) error {
+func (cmd *DryRunCmd) Run(ctx *Context) error {
 	config, err := LoadConfig(ctx.ConfigPath.GetAgentConfigPath())
 	if err != nil {
 		log.Println("Cannot load config", err)
@@ -92,7 +92,6 @@ func (cmd *DirectCmd) Run(ctx *Context) error {
 
 	rule := config.Rules[0]
 	uuid := uuid.New().String()
-	rclone := NewRClone(ctx.ConfigPath)
 
 	if _, err := os.Stat(rule.Src); errors.Is(err, os.ErrNotExist) {
 		err := os.Mkdir(rule.Src, os.ModePerm)
@@ -102,28 +101,28 @@ func (cmd *DirectCmd) Run(ctx *Context) error {
 		}
 	}
 
+	sender, err := NewS3Sender(&rule, nil, config.ExcludePatterns, ctx.ConfigPath, nil)
+	if err != nil {
+		log.Println("Failed to create Cron sender", err)
+		return err
+	}
+
 	cron := cron.New()
-	cron.AddFunc(rule.CronSender, func() {
-		if err := rclone.Sync(rule.Dest, uuid, rule.Src); err != nil {
-			panic(err)
-		}
-	})
+	cron.AddFunc(rule.CronSender, func() { sender.DryRunCycle(uuid) })
 	cron.Start()
 
-	// Run until SIGINT or SIGTERM is received.
+	// Run until a termination signal is received.
 	sigs := make(chan os.Signal, 1)
 	done := make(chan bool, 1)
 
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL, syscall.SIGQUIT)
 
 	go func() {
 		sig := <-sigs
 		cron.Stop()
 
 		log.Printf("Received %v Signal. Resync before shutdown ...\n", sig)
-		if err := rclone.Sync(rule.Dest, uuid, rule.Src); err != nil {
-			log.Println("Received error during last sync: ", err)
-		}
+		sender.DryRunCycle(uuid)
 		done <- true
 	}()
 
@@ -272,7 +271,7 @@ type CLI struct {
 	Debug        bool         `help:"Enable debug mode."`
 	ConfigFolder string       `help:"Path to the agent config folder."`
 	Sync         SyncCmd      `cmd:"" name:"sync" help:"Run the sync daemon."`
-	Direct       DirectCmd    `cmd:"" name:"direct" help:"Run the daemon in direct mode."`
+	DryRun       DryRunCmd    `cmd:"" name:"dry-run" help:"Run the daemon in direct mode."`
 	Rebuild      RebuildDbCmd `cmd:"" name:"rebuild" help:"Rebuild the internal Postgres DB."`
 	TestRule     TestRuleCmd  `cmd:"" name:"test-rule" help:"Test a rule on a file."`
 	Config       ConfigCmd    `cmd:"" name:"config" help:"Manage the config."`
