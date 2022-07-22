@@ -110,18 +110,16 @@ class TestS3AgentClassComplex:
         create_file(first_file_path, first_content)
         time.sleep(2)
         create_file(second_file_path, second_content)
-        time.sleep(1)
+        time.sleep(2)
 
         ### THEN ###
         assert_rclone_file(first_file_path)
         assert_rclone_file(second_file_path, False)
 
-        time.sleep(2)
-
         with open(f'{FILESYSTEM_PATH}/{first_file_path}', 'w') as file:
             file.write(second_content)
 
-        time.sleep(1)
+        time.sleep(2)
 
         assert_rclone_file(first_file_path, False)
         assert_rclone_file(second_file_path)

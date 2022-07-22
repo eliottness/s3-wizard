@@ -20,6 +20,7 @@ def run_command(cmd, stdout=None, stderr=None, code=None, presence=True):
 
 def start_agent(config_path, reset_env=True):
     if reset_env:
+        run_command(f'umount tmp')
         run_command(f'rm -rf {S3_AGENT_PATH} {FILESYSTEM_PATH}', code=0)
 
     # Set config then run s3-agent in sync mode
@@ -46,6 +47,7 @@ def stop_agent(process=None, connection=None, reset_env=True):
         process.wait()
 
     if reset_env:
+        run_command(f'umount tmp')
         run_command(f'rm -rf {S3_AGENT_PATH} {FILESYSTEM_PATH}', code=0)
 
 
