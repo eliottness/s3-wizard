@@ -5,17 +5,18 @@ import time
 
 
 DEBUG = False
-NB_TRY = 10
+NB_TRY = 20
 FILESYSTEM_PATH = './tmp'
 S3_AGENT_PATH = "./config"
 
 
-def run_command(cmd, stdout=None, stderr=None, code=None):
+def run_command(cmd, stdout=None, stderr=None, code=None, presence=True):
     process = subprocess.run(cmd.split(' '), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
     result = process.returncode, process.stdout.decode(), process.stderr.decode()
+    print(presence)
     assert True if code is None else result[0] == code, result
-    assert True if stdout is None else result[1] != "" if stdout is True else result[1] == stdout, result
-    assert True if stderr is None else result[2] != "" if stderr is True else result[2] == stderr, result
+    assert True if stdout is None else stdout in result[1] if presence else stdout not in result[1], result
+    assert True if stderr is None else stderr in result[2] if presence else stderr not in result[2], result
 
 
 def start_agent(config_path, reset_env=True):
@@ -67,12 +68,11 @@ def get_node_entry(cursor, filename):
     return cursor.fetchone()
 
 
-def assert_rclone_file(file_path):
+def assert_rclone_file(file_path, presence=True):
     rclone_config_path = os.path.join(S3_AGENT_PATH, 'rclone.conf.tmp')
     s3_file_path = os.path.join("remote:bucket-test/s3-agent")
-    file_name = os.path.basename(os.path.normpath(file_path))
-    cmd = f'./rclone --config {rclone_config_path} lsf {s3_file_path} --include "{file_name}"'
-    run_command(cmd, stdout=True, stderr='', code=0)
+    cmd = f'./rclone --config {rclone_config_path} lsjson --files-only -R {s3_file_path}'
+    run_command(cmd, stdout=file_path, code=0, presence=presence)
 
 
 def assert_entry_state(cursor, filename, size, Local, server):

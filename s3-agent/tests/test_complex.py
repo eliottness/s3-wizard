@@ -4,7 +4,7 @@ import sqlite3
 import subprocess
 import time
 
-from .utils import assert_rclone_file, create_file, assert_agent_file, start_agent, stop_agent, run_command, get_rule_entry, assert_entry_state, S3_AGENT_PATH
+from .utils import assert_rclone_file, create_file, assert_agent_file, start_agent, stop_agent, run_command, get_rule_entry, assert_entry_state, S3_AGENT_PATH, FILESYSTEM_PATH
 
 
 @pytest.mark.usefixtures('handle_server')
@@ -13,8 +13,8 @@ class TestS3AgentClassComplex:
 
     def test_import_folder(self):
         ### GIVEN ###
-        first_file_path = 'test_simple_file.txt'
-        second_file_path = 'folder/test_simple_file.txt'
+        first_file_path = 'import_file_1.txt'
+        second_file_path = 'folder/import_file_2.txt'
         first_content = 'Hello world first'
         second_content = 'Hello world second'
 
@@ -37,8 +37,8 @@ class TestS3AgentClassComplex:
         ### GIVEN ###
         process, connection = start_agent('tests/data/simple_config.json')
 
-        first_file_path = 'test_simple_file.txt'
-        second_file_path = 'folder/test_simple_file.txt'
+        first_file_path = 'restart_file_1.txt'
+        second_file_path = 'folder/restart_file_2.txt'
         first_content = 'Hello world first'
         second_content = 'Hello world second'
 
@@ -63,8 +63,8 @@ class TestS3AgentClassComplex:
         ### GIVEN ###
         process, connection = start_agent('tests/data/simple_config.json')
 
-        first_file_path = 'test_simple_file.txt'
-        second_file_path = 'folder/test_simple_file.txt'
+        first_file_path = 'rebuild_file_1.txt'
+        second_file_path = 'folder/rebuild_file_2.txt'
         first_content = 'Hello world first'
         second_content = 'Hello world second'
 
@@ -95,25 +95,37 @@ class TestS3AgentClassComplex:
         stop_agent(connection=connection)
 
 
-    def test_direct_mode(self):
+    def test_dry_run_mode(self):
         ### GIVEN ###
-        config_path = 'tests/data/simple_config.json'
+        config_path = 'tests/data/slow_config.json'
         run_command(f'./s3-agent --config-folder={S3_AGENT_PATH} config import {config_path}', code=0)
-        process = subprocess.Popen(f'./s3-agent --config-folder={S3_AGENT_PATH} direct'.split(' '))
+        process = subprocess.Popen(f'./s3-agent --config-folder={S3_AGENT_PATH} dry-run'.split(' '))
 
         ### WHEN ###
-        first_file_path = 'test_simple_file.txt'
-        second_file_path = 'folder/test_simple_file.txt'
+        first_file_path = 'dry_run_file_1.txt'
+        second_file_path = 'folder/dry_run_file_2.txt'
         first_content = 'Hello world first'
         second_content = 'Hello world second'
 
         create_file(first_file_path, first_content)
+        time.sleep(2)
         create_file(second_file_path, second_content)
+        time.sleep(1)
+
+        ### THEN ###
+
+        assert_rclone_file(first_file_path)
+        assert_rclone_file(second_file_path, False)
 
         time.sleep(2)
 
-        ### THEN ###
-        assert_rclone_file(first_file_path)
+        with open(f'{FILESYSTEM_PATH}/{first_file_path}', 'w') as file:
+            file.write(second_content)
+
+        time.sleep(1)
+
+        assert_rclone_file(first_file_path, False)
         assert_rclone_file(second_file_path)
 
+        # Reset testing environment
         stop_agent(process)
