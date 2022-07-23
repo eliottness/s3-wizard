@@ -206,5 +206,5 @@ func importFile(oldPath, newPath string, info os.FileInfo, rule Rule, orm *SQlit
 	}
 
 	log.Printf("Imported file: %v -> %v", oldPath, dest)
-	return os.Rename(oldPath, newPath)
+	return moveFile(oldPath, newPath)
 }
