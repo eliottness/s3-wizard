@@ -139,7 +139,6 @@ func (rule *Rule) MustBeRemote(path string) bool {
 	default:
 		panic(fmt.Errorf("Rule type '%s' not implemented", rule.Type))
 	}
-
 }
 
 func (rule *Rule) olderThan(path string) bool {

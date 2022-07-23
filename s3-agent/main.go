@@ -121,8 +121,7 @@ func (cmd *DryRunCmd) Run(ctx *Context) error {
 		sig := <-sigs
 		cron.Stop()
 
-		log.Printf("Received %v Signal. Resync before shutdown ...\n", sig)
-		sender.DryRunCycle(uuid)
+		log.Printf("Received %v Signal. Shutdown ...\n", sig)
 		done <- true
 	}()
 

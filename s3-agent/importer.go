@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"io"
 	"io/fs"
 	"io/ioutil"
 	"log"
@@ -10,6 +12,30 @@ import (
 )
 
 type customWalkFunc func(path string, info fs.FileInfo) error
+
+func moveFile(sourcePath, destPath string) error {
+	inputFile, err := os.Open(sourcePath)
+	if err != nil {
+		return fmt.Errorf("Couldn't open source file: %s", err)
+	}
+	outputFile, err := os.Create(destPath)
+	if err != nil {
+		inputFile.Close()
+		return fmt.Errorf("Couldn't open dest file: %s", err)
+	}
+	defer outputFile.Close()
+	_, err = io.Copy(outputFile, inputFile)
+	inputFile.Close()
+	if err != nil {
+		return fmt.Errorf("Writing to output file failed: %s", err)
+	}
+	// The copy was successful, so now delete the original file
+	err = os.Remove(sourcePath)
+	if err != nil {
+		return fmt.Errorf("Failed removing original file: %s", err)
+	}
+	return nil
+}
 
 // Is Supposed to ask the user if he want to import the current existing folder to
 // the s3-agent filesystem
@@ -53,7 +79,7 @@ func importFS(rule Rule, config *ConfigPath, orm *SQlite) error {
 			}
 
 			// if this rename fails it's ok, it's only some sockets or special files
-			os.Rename(oldPath, newPath)
+			moveFile(oldPath, newPath)
 			return nil
 		},
 	); err != nil {
